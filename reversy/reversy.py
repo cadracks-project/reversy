@@ -92,6 +92,65 @@ class Assembly(object):
 
             self.G.add_node(k, pcloud=pcloud, shape=shell)
 
+    def view_graph(self,**kwargs):
+        """ view an assembly graph 
+
+
+        """
+        fontsize=kwargs.pop('fontsize',18)
+        v = kwargs.pop('v',20)
+        bsave = kwargs.pop('bsave',False)
+        bshow= kwargs.pop('bshow'True)
+        blabels = kwargs('balbels',False)
+        alpha = kwargs('alpha',0.5)
+        figsize= kwargs('figsize',(6,6))
+
+        dxy = { k : (self.pos[k][0],self.pos[k][1]) for k in self.node.keys() }
+        dxyl = { k : (self.pos[k][0]+(v*np.random.rand()-v/2.),self.pos[k][1]+(v*np.random.rand()-v/2.)) for k in self.node.keys() }
+        dxz = { k : (self.pos[k][0],self.pos[k][2]) for k in self.node.keys() }
+        dxzl = { k : (self.pos[k][0]+(v*np.random.rand()-v/2),self.pos[k][2]+(v*np.random.rand()-v/2.)) for k in self.node.keys() }
+        dyz = { k : (self.pos[k][2],self.pos[k][1]) for k in self.node.keys() }
+        dyzl = { k : (self.pos[k][2]+(v*np.random.rand()-v/2),self.pos[k][1]+(v*np.random.rand()-v/2.)) for k in self.node.keys() }
+        node_size = [ self.node[k]['dim'] for k in self.node.keys() ]
+        #dlab = {k : str(int(np.ceil(self.node[k]['dim']))) for k in self.node.keys() if self.edge[k].keys()==[] }
+        dlab = {k : self.node[k]['name'] for k in self.node.keys() }
+
+        plt.figure(figsize=figsize)
+        plt.suptitle(self.origin,fontsize=fontsize+2)
+        plt.subplot(2,2,1)
+        nself.draw_networkx_nodes(x,dxy,node_size=node_size,alpha=alpha)
+        nself.draw_networkx_edges(x,dxy)
+        if blabels:
+            nself.draw_networkx_labels(x,dxyl,labels=dlab,font_size=fontsize)
+        plt.xlabel('X axis (mm)',fontsize=fontsize)
+        plt.ylabel('Y axis (mm)',fontsize=fontsize)
+        plt.title("XY plane",fontsize=fontsize)
+        plt.subplot(2,2,2)
+        nself.draw_networkx_nodes(x,dyz,node_size=node_size,alpha=alpha)
+        nself.draw_networkx_edges(x,dyz)
+        if blabels:
+            nself.draw_networkx_labels(x,dyzl,labels=dlab,font_size=fontsize)
+        plt.xlabel('Z axis (mm)',fontsize=fontsize)
+        plt.ylabel('Y axis (mm)',fontsize=fontsize)
+        plt.title("ZY plane",fontsize=fontsize)
+        plt.subplot(2,2,3)
+        nself.draw_networkx_nodes(x,dxz,node_size=node_size,alpha=alpha)
+        nself.draw_networkx_edges(x,dxz)
+        if blabels:
+            nself.draw_networkx_labels(x,dxzl,labels=dlab,font_size=fontsize)
+        plt.title("XZ plane",fontsize=fontsize)
+        plt.xlabel('X axis (mm)',fontsize=fontsize)
+        plt.ylabel('Z axis (mm)',fontsize=fontsize)
+        plt.subplot(2,2,4)
+        if blabels:
+            nself.draw(x,labels=dlab,alpha=alpha,font_size=fontsize,node_size=node_size)
+        else:
+            nself.draw(x,alpha=alpha,font_size=fontsize,node_size=node_size)
+        if bsave:
+            plt.savefig(self.origin+'png')
+        if bshow:
+            plt.show()
+
     def __repr__(self):
         st = self.shape.__repr__()+'\n'
         st += self.G.__repr__()+'\n'
