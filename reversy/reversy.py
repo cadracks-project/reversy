@@ -10,20 +10,22 @@ import wx
 import os
 import logging
 from os import path as _path
+from osvcad.nodes import AssemblyGeometryNode
 import ccad.model as cm
 import ccad.display as cd
 from aocxchange.step import StepImporter
 from aocutils.display.wx_viewer import Wx3dViewer
+import matplotlib.pyplot as plt
 import numpy as np
 import networkx as nx
 import ccad.model as ccm
 import pointcloud as pc
 logger = logging.getLogger('__name__')
 
-class Assembly(object):
+class Assembly(nx.DiGraph):
     r""" Assembly Class
 
-    This class has to be connected to the osvcad Assembly representation
+    This class has to be connected to the osvcad AssemblyGeometry representation
 
     Methods
     -------
@@ -48,9 +50,10 @@ class Assembly(object):
 
         """
 
+        super(Assembly,self).__init__()
         self.shape = shape
-        self.G = nx.DiGraph()
-        self.G.pos = dict()
+        #self.G = nx.DiGraph()
+        self.pos = dict()
         self.origin = origin
 
         shells = self.shape.subshapes("Shell")
@@ -58,7 +61,7 @@ class Assembly(object):
 
         for k, shell in enumerate(shells):
             logger.info("Dealing with shell nb %i" % k)
-            self.G.pos[k] = shell.center()
+            self.pos[k] = shell.center()
             #pcloud = np.array([[]])
             #pcloud.shape = (3, 0)
             pcloud = pc.PointCloud()
@@ -90,20 +93,30 @@ class Assembly(object):
                     if face_type == "cylinder":
                         pass
 
-            self.G.add_node(k, pcloud=pcloud, shape=shell)
+            self.add_node(k, pcloud=pcloud, shape=shell)
 
     def view_graph(self,**kwargs):
-        """ view an assembly graph 
+        """ view an assembly graph
 
+        Parameters
+        ----------
+
+        fontsize
+        v
+        bshow
+        blabels
+        alpha
+        figsize
 
         """
-        fontsize=kwargs.pop('fontsize',18)
-        v = kwargs.pop('v',20)
-        bsave = kwargs.pop('bsave',False)
-        bshow= kwargs.pop('bshow'True)
-        blabels = kwargs('balbels',False)
-        alpha = kwargs('alpha',0.5)
-        figsize= kwargs('figsize',(6,6))
+
+        fontsize=kwargs.pop('fontsize', 18)
+        v = kwargs.pop('v', 20)
+        bsave = kwargs.pop('bsave', False)
+        bshow= kwargs.pop('bshow', True)
+        blabels = kwargs.pop('blabels', False)
+        alpha = kwargs.pop('alpha', 0.5)
+        figsize= kwargs.pop('figsize', (6,6))
 
         dxy = { k : (self.pos[k][0],self.pos[k][1]) for k in self.node.keys() }
         dxyl = { k : (self.pos[k][0]+(v*np.random.rand()-v/2.),self.pos[k][1]+(v*np.random.rand()-v/2.)) for k in self.node.keys() }
@@ -111,41 +124,43 @@ class Assembly(object):
         dxzl = { k : (self.pos[k][0]+(v*np.random.rand()-v/2),self.pos[k][2]+(v*np.random.rand()-v/2.)) for k in self.node.keys() }
         dyz = { k : (self.pos[k][2],self.pos[k][1]) for k in self.node.keys() }
         dyzl = { k : (self.pos[k][2]+(v*np.random.rand()-v/2),self.pos[k][1]+(v*np.random.rand()-v/2.)) for k in self.node.keys() }
-        node_size = [ self.node[k]['dim'] for k in self.node.keys() ]
+        #node_size = [ self.node[k]['dim'] for k in self.node.keys() ]
+        node_size = 10
+
         #dlab = {k : str(int(np.ceil(self.node[k]['dim']))) for k in self.node.keys() if self.edge[k].keys()==[] }
-        dlab = {k : self.node[k]['name'] for k in self.node.keys() }
+        dlab = {k : self.node[k]['pcloud'].sig for k in self.node.keys() }
 
         plt.figure(figsize=figsize)
         plt.suptitle(self.origin,fontsize=fontsize+2)
         plt.subplot(2,2,1)
-        nself.draw_networkx_nodes(x,dxy,node_size=node_size,alpha=alpha)
-        nself.draw_networkx_edges(x,dxy)
+        nx.draw_networkx_nodes(self,dxy,node_size=node_size,alpha=alpha)
+        nx.draw_networkx_edges(self,dxy)
         if blabels:
-            nself.draw_networkx_labels(x,dxyl,labels=dlab,font_size=fontsize)
+            nself.draw_networkx_labels(self,dxyl,labels=dlab,font_size=fontsize)
         plt.xlabel('X axis (mm)',fontsize=fontsize)
         plt.ylabel('Y axis (mm)',fontsize=fontsize)
         plt.title("XY plane",fontsize=fontsize)
         plt.subplot(2,2,2)
-        nself.draw_networkx_nodes(x,dyz,node_size=node_size,alpha=alpha)
-        nself.draw_networkx_edges(x,dyz)
+        nx.draw_networkx_nodes(self,dyz,node_size=node_size,alpha=alpha)
+        nx.draw_networkx_edges(self,dyz)
         if blabels:
-            nself.draw_networkx_labels(x,dyzl,labels=dlab,font_size=fontsize)
+            nx.draw_networkx_labels(self,dyzl,labels=dlab,font_size=fontsize)
         plt.xlabel('Z axis (mm)',fontsize=fontsize)
         plt.ylabel('Y axis (mm)',fontsize=fontsize)
         plt.title("ZY plane",fontsize=fontsize)
         plt.subplot(2,2,3)
-        nself.draw_networkx_nodes(x,dxz,node_size=node_size,alpha=alpha)
-        nself.draw_networkx_edges(x,dxz)
+        nx.draw_networkx_nodes(self,dxz,node_size=node_size,alpha=alpha)
+        nx.draw_networkx_edges(self,dxz)
         if blabels:
-            nself.draw_networkx_labels(x,dxzl,labels=dlab,font_size=fontsize)
+            nx.draw_networkx_labels(self,dxzl,labels=dlab,font_size=fontsize)
         plt.title("XZ plane",fontsize=fontsize)
         plt.xlabel('X axis (mm)',fontsize=fontsize)
         plt.ylabel('Z axis (mm)',fontsize=fontsize)
         plt.subplot(2,2,4)
         if blabels:
-            nself.draw(x,labels=dlab,alpha=alpha,font_size=fontsize,node_size=node_size)
+            nx.draw(self,labels=dlab,alpha=alpha,font_size=fontsize,node_size=node_size)
         else:
-            nself.draw(x,alpha=alpha,font_size=fontsize,node_size=node_size)
+            nx.draw(self,alpha=alpha,font_size=fontsize,node_size=node_size)
         if bsave:
             plt.savefig(self.origin+'png')
         if bshow:
@@ -153,7 +168,8 @@ class Assembly(object):
 
     def __repr__(self):
         st = self.shape.__repr__()+'\n'
-        st += self.G.__repr__()+'\n'
+        for k in self.node:
+            st += self.node[k]['pcloud'].sig  +'\n'
         return st
 
     @classmethod
@@ -180,9 +196,9 @@ class Assembly(object):
     def tag_nodes(self):
         r"""Add computed data to each node of the assembly"""
 
-        for k in self.G.node:
+        for k in self.node:
             # sig, V, ptm, q, vec, ang = signature(self.G.node[k]['pcloud'])
-            self.G.node[k]['pcloud'].signature()
+            self.node[k]['pcloud'].signature()
             #self.G.node[k]['name'] = sig
             #self.G.node[k]['R'] = V
             #self.G.node[k]['ptm'] = ptm
@@ -202,16 +218,16 @@ class Assembly(object):
             msg = "The components of the assembly should already exist"
             raise ValueError(msg)
 
-        for k in self.G.node:
+        for k in self.node:
             #sig, V, ptm, q, vec, ang = signature(self.G.node[k]['pcloud'])
-            self.G.node[k]['pcloud'].signature()
+            self.node[k]['pcloud'].signature()
 
-            sig = self.G.node[k]['pcloud'].sig
-            vec = self.G.node[k]['pcloud'].vec
-            ang = self.G.node[k]['pcloud'].ang
-            ptm = self.G.node[k]['pcloud'].ptm
+            sig = self.node[k]['pcloud'].sig
+            vec = self.node[k]['pcloud'].vec
+            ang = self.node[k]['pcloud'].ang
+            ptm = self.node[k]['pcloud'].ptm
 
-            shp = self.G.node[k]['shape']
+            shp = self.node[k]['shape']
             filename = sig + ".stp"
             if not os.path.isfile(filename):
                 shp.translate(-ptm)
