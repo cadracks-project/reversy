@@ -100,7 +100,7 @@ class PointCloud(object):
         self.pc = np.mean(self.p, axis=0)
         self.p= self.p - self.pc
 
-    def sorting(self):
+    def ordering(self):
         #
         # sorting points w.r.t distance to origin
         # This ordering is needed for PointClouds comparison
