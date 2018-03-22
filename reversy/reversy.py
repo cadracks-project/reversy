@@ -29,9 +29,13 @@ class Assembly(nx.DiGraph):
     This class has to be connected to the osvcad AssemblyGeometry representation
 
     An Assembly is a Graph.
+
     Each node of an Assembly represents a solid or an Assembly
+
     Each node of an Assembly is described in an external file
+
     A node has the following attributes :
+
     'name' : name of the origin file (step file or python file)
         'V' : a unitary matrix
         'dim' : a dimension integer
@@ -105,9 +109,19 @@ class Assembly(nx.DiGraph):
             # add shape to graph if shell not degenerated
             Npoints = pcloud.p.shape[0]
 
+            pcloud.centering()
+            pcloud.ordering()
+
             if ((shell.area()>0) and Npoints >=3):
                 self.add_node(k, pcloud=pcloud, shape=shell)
                 self.pos[k] = shell.center()
+
+    def __repr__(self):
+        #st = self.shape.__repr__()+'\n'
+        st = ''
+        for k in self.node:
+            st += self.node[k]['name']  +'\n'
+        return st
 
     def view_graph(self,**kwargs):
         """ view an assembly graph
@@ -180,11 +194,6 @@ class Assembly(nx.DiGraph):
         if bshow:
             plt.show()
 
-    def __repr__(self):
-        #st = self.shape.__repr__()+'\n'
-        for k in self.node:
-            st += self.node[k]['pcloud'].name  +'\n'
-        return st
 
     @classmethod
     def from_step(cls, filename, direct=False):
@@ -234,9 +243,9 @@ class Assembly(nx.DiGraph):
              maxk = np.max(pcloudk.p,axis=0)
              dk = pcloudk.dist
              for j in range(k):
-                pj = self.node[k]['pcloud']
-                dj = self.node[j]['dist']
-                if len(dk)==len(dj):
+                pcloudj = self.node[k]['pcloud']
+                dj = pcloudj.dist
+                if len(dk) == len(dj):
                     Edn = np.sum(dk)
                     Edj = np.sum(dj)
                     rho1 = np.abs(Edn-Edj)/(Edn+Edj)
@@ -268,9 +277,9 @@ class Assembly(nx.DiGraph):
             lsamek = [ x for x in self.edge[k].keys() if self.edge[k][x]['equal']]
 
             if lsamek==[]:
-                self.lsig.append(sig)
+                self.lsig.append(pcloudk.sig)
                 self.node[k]['name'] = pcloudk.sig
-                # self.node[k]['V'] = V
+                self.node[k]['V'] = pcloudk.V
                 # self.node[k]['dim'] = dim
             else:
                 refnode = [x for x in lsamek if self.edge[x].keys()==[]][0]
@@ -284,8 +293,8 @@ class Assembly(nx.DiGraph):
                 #
                 # The symmetry is informed in the node
                 #
-
-                dp = np.sum(np.abs(pcsame-pcloudk.pc),axis=1)
+                vec = np.abs(pcsame-pcloudk.pc)[None,:]
+                dp = np.sum(vec,axis=0)
                 nomirror = np.isclose(dp,0)
                 if nomirror[0]==False:
                     self.add_node(k,mx=True)
@@ -294,11 +303,11 @@ class Assembly(nx.DiGraph):
                 if nomirror[2]==False:
                     self.add_node(k,mz=True)
 
-            self.node[k]['V'] = V
-            self.node[k]['pc'] = pc
-            self.node[k]['dim'] = int(np.ceil(dim))
+            self.node[k]['V'] = pcloudk.V
+            self.node[k]['pc'] = pcloudk.pc
+            #self.node[k]['dim'] = int(np.ceil(dim))
 
-
+        # unique the list
         self.lsig = list(set(self.lsig))
         self.Nn = len(self.node)
 
@@ -423,12 +432,13 @@ class Assembly(nx.DiGraph):
             sig = self.node[k]['pcloud'].sig
             vec = self.node[k]['pcloud'].vec
             ang = self.node[k]['pcloud'].ang
-            ptm = self.node[k]['pcloud'].ptm
+            pc = self.node[k]['pcloud'].pc
+            V = self.node[k]['pcloud'].V
 
             shp = self.node[k]['shape']
             filename = name + ".stp"
             if not os.path.isfile(filename):
-                shp.translate(-ptm)
+                shp.translate(-pc)
                 if abs(ang)>0:
                     shp.rotate(np.array([0, 0, 0]), vec, ang)
                 filename = os.path.join(subdirectory, filename)
@@ -448,11 +458,17 @@ def reverse(step_filename, view=False):
 
     """
 
-    # read a step file
+    # read a step file and add nodes to graph
     assembly = Assembly.from_step(step_filename, direct=False)
-    # decompose assembl in elementary parts
+    # write a separate step file for each node
     assembly.write_components()
-
+    # tag and analyze nodes - creates edges between nodes based
+    # on dicovered pointcloud similarity and proximity
+    #
+    # similarity precursor of symetry
+    # proximity precursor of contact
+    # join axiality precursor of co-axiality (alignment)
+    #
     assembly.tag_nodes()
 
     if view:
@@ -498,9 +514,9 @@ if __name__ == "__main__":
                         format='%(asctime)s :: %(levelname)6s :: '
                                '%(module)20s :: %(lineno)3d :: %(message)s')
     #filename = "../step/0_tabby2.stp"  # OCC compound
-    #filename = "../step/ASM0001_ASM_1_ASM.stp"  # OCC compound
+    filename = "../step/ASM0001_ASM_1_ASM.stp"  # OCC compound
     # filename = "../step/MOTORIDUTTORE_ASM.stp" # OCC compound
-    filename = "../step/aube_pleine.stp"  # OCC Solid
+    #filename = "../step/aube_pleine.stp"  # OCC Solid
 
-    a1 = reverse(filename)
+    a1 = reverse(filename,view=True)
     #cd.view(a1)
