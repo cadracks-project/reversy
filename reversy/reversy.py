@@ -243,8 +243,9 @@ class Assembly(nx.DiGraph):
              maxk = np.max(pcloudk.p,axis=0)
              dk = pcloudk.dist
              for j in range(k):
-                pcloudj = self.node[k]['pcloud']
+                pcloudj = self.node[j]['pcloud']
                 dj = pcloudj.dist
+                # same number of points
                 if len(dk) == len(dj):
                     Edn = np.sum(dk)
                     Edj = np.sum(dj)
@@ -427,22 +428,25 @@ class Assembly(nx.DiGraph):
         for k in self.node:
             # calculate point cloud signature
             self.node[k]['pcloud'].signature()
-
             name = self.node[k]['pcloud'].name
-            sig = self.node[k]['pcloud'].sig
-            vec = self.node[k]['pcloud'].vec
-            ang = self.node[k]['pcloud'].ang
             pc = self.node[k]['pcloud'].pc
             V = self.node[k]['pcloud'].V
-
+            self.node[k]['pc'] = pc
+            self.node[k]['V'] = V
+            self.node[k]['name'] = name
+            self.node[k]['sig'] = self.node[k]['pcloud'].sig
+            self.node[k]['vec'] = self.node[k]['pcloud'].vec
+            self.node[k]['ang'] = self.node[k]['pcloud'].ang
             shp = self.node[k]['shape']
             filename = name + ".stp"
+            filename = os.path.join(subdirectory, filename)
             if not os.path.isfile(filename):
                 shp.translate(-pc)
-                if abs(ang)>0:
-                    shp.rotate(np.array([0, 0, 0]), vec, ang)
-                filename = os.path.join(subdirectory, filename)
-                shp.to_step(filename)
+                shp.transform(V.T)
+                sol = cm.Solid([shp])
+                #if abs(ang)>0:
+                #    shp.rotate(np.array([0, 0, 0]), vec, ang)
+                sol.to_step(filename)
 
 
 def reverse(step_filename, view=False):

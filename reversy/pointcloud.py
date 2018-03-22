@@ -149,7 +149,6 @@ class PointCloud(object):
             name = getname(dimension=S0+'#'+S1+'#'+S2)
 
         sig = S0 + "_" + S1 + "_" + S2
-
         self.sig = sig
         self.name = name
         self.V = V
