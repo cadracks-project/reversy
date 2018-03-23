@@ -325,7 +325,6 @@ class Assembly(nx.DiGraph):
         get unitary matrix V and ravels it
 
         """
-        pdb.set_trace()
         for (n,d) in self.nodes(data=True):
             V = d['V']
             pc = d['pc']
@@ -467,9 +466,9 @@ def reverse(step_filename, view=False):
     #
     assembly.tag_nodes()
     # assembly saving
-    assembly.save_gml()
+    #assembly.save_gml()
 
-    assembly.save_json()
+    #assembly.save_json()
 
     if view:
         ccad_viewer = cd.view()
@@ -513,10 +512,10 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s :: %(levelname)6s :: '
                                '%(module)20s :: %(lineno)3d :: %(message)s')
-    #filename = "../step/0_tabby2.stp"  # OCC compound
-    filename = "../step/ASM0001_ASM_1_ASM.stp"  # OCC compound
+    filename = "../step/0_tabby2.stp"  # OCC compound
+    #filename = "../step/ASM0001_ASM_1_ASM.stp"  # OCC compound
     # filename = "../step/MOTORIDUTTORE_ASM.stp" # OCC compound
     #filename = "../step/aube_pleine.stp"  # OCC Solid
 
-    a1 = reverse(filename,view=True)
+    a1 = reverse(filename,view=False)
     #cd.view(a1)

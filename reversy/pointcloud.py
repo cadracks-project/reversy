@@ -170,7 +170,7 @@ class PointCloud(object):
         S1 = str(int(np.ceil(S[1])))
         if S[2]<1e-6:
             S2 = '0'
-            name = getname(dimension=S0+'#'+S1+'#'+S2,function='CYLINDER')
+            name = getname(dimension=S0+'#'+S1+'#'+S2,function='SYMAX')
         else:
             S2 = str(int(np.ceil(S[2])))
             name = getname(dimension=S0+'#'+S1+'#'+S2)
