@@ -10,6 +10,8 @@ import wx
 import os
 import pdb
 import logging
+import json
+from networkx.readwrite import json_graph
 from os import path as _path
 from osvcad.nodes import AssemblyGeometryNode
 import ccad.model as cm
@@ -50,71 +52,61 @@ class Assembly(nx.DiGraph):
     __repr__
 
     """
-    def __init__(self, shape, origin=None, direct=False):
+    def __init__(self, shape, origin=None, bclean=True):
         """
         Parameters
         ----------
 
-        shape :
+        shape : cm.Shape  (single cm.Solid should be a compound)
         origin : str
             The file or script the assembly was created from
-        direct : bool, optional(default is False)
-            If True, directly uses the point cloud of the Shell
-            If False, iterate the faces, wires and then vertices
+        bclean : boolean
+            this indicates the provenance of the Assembly
+            + a graph file (clean)
+            + a step file (not clean)
 
         """
 
         super(Assembly,self).__init__()
         self.shape = shape
+        #
+        # if it contains, An Assembly:
+        # is clean : filename and transformation
+        # is not clean : pointcloud and shape
+        #
+        self.bclean = bclean
         #self.G = nx.DiGraph()
         self.pos = dict()
         self.origin = origin
-
         shells = self.shape.subshapes("Shell")
         logger.info("%i shells in assembly" % len(shells))
+        nnode = 0
         for k, shell in enumerate(shells):
-            logger.info("Dealing with shell nb %i" % k)
-            #pcloud = np.array([[]])
-            #pcloud.shape = (3, 0)
-            pcloud = pc.PointCloud()
+            solid = cm.Solid([shell])
+            # check the shell coresponds to a cosed solid
+            if solid.check():
+                logger.info("Dealing with shell nb %i" % k)
+                #pcloud = np.array([[]])
+                #pcloud.shape = (3, 0)
+                pcloud = pc.PointCloud()
 
-            if direct:
                 vertices = shell.subshapes("Vertex")
                 logger.info("%i vertices found for direct method")
                 for vertex in vertices:
                     point = np.array(vertex.center())[:, None]
                     #pcloud = np.append(pcloud, point, axis=1)
                     pcloud = pcloud + point
-            else:
-                # get faces from shell
-                faces = shell.subshapes("Face")
 
-                for face in faces:
-                    face_type = face.type()
-                    wires = face.subshapes("Wire")
+                # add shape to graph if shell not degenerated
+                Npoints = pcloud.p.shape[0]
 
-                    for wire in wires:
-                        vertices = wire.subshapes("Vertex")
 
-                        for vertex in vertices:
-                            point = np.array(vertex.center())[:, None]
-                            #pcloud = np.append(pcloud, point, axis=1)
-                            pcloud = pcloud + point
-
-                    if face_type == "plane":
-                        pass
-                    if face_type == "cylinder":
-                        pass
-
-            # add shape to graph if shell not degenerated
-            Npoints = pcloud.p.shape[0]
-
-            pcloud.centering()
-            pcloud.ordering()
-
-            if ((shell.area()>0) and Npoints >=3):
-                self.add_node(k, pcloud=pcloud, shape=shell)
-                self.pos[k] = shell.center()
+                if ((shell.area()>0) and Npoints >=3):
+                    pcloud.centering()
+                    pcloud.ordering()
+                    self.add_node(nnode, pcloud=pcloud, shape=shell)
+                    self.pos[nnode] = shell.center()
+                    nnode += 1
 
     def __repr__(self):
         #st = self.shape.__repr__()+'\n'
@@ -123,8 +115,8 @@ class Assembly(nx.DiGraph):
             st += self.node[k]['name']  +'\n'
         return st
 
-    def view_graph(self,**kwargs):
-        """ view an assembly graph
+    def show_graph(self,**kwargs):
+        """ show an assembly graph
 
         Parameters
         ----------
@@ -196,7 +188,7 @@ class Assembly(nx.DiGraph):
 
 
     @classmethod
-    def from_step(cls, filename, direct=False):
+    def from_step(cls, filename):
         r"""Create an Assembly instance from a STEP file
 
         Parameters
@@ -214,7 +206,7 @@ class Assembly(nx.DiGraph):
 
         """
         solid = cm.from_step(filename)
-        return cls(solid, origin=filename, direct=direct)
+        return cls(solid, origin=filename,bclean = False)
 
     def tag_nodes(self):
         r"""Add computed data to each node of the assembly
@@ -319,8 +311,6 @@ class Assembly(nx.DiGraph):
         for (n,d) in self.nodes(data=True):
             del d['pcloud']
             del d['shape']
-            del d['dist']
-            del d['pc']
 
         # set a boolean for not cleaning twice
         self.bclean = True
@@ -335,17 +325,19 @@ class Assembly(nx.DiGraph):
         get unitary matrix V and ravels it
 
         """
+        pdb.set_trace()
         for (n,d) in self.nodes(data=True):
             V = d['V']
-            ptc = d['ptc']
+            pc = d['pc']
             lV = str(list((d['V'].ravel())))
-            lptc = str(list((d['ptc'])))
-            ptcr = np.array(eval(lptc))
+            lpc = str(list((d['pc'])))
+            pcr = np.array(eval(lpc))
             Vr = np.array(eval(lV)).reshape(3,3)
             assert(np.isclose(V-Vr,0).all())
-            assert(np.isclose(ptc-ptcr,0).all())
-            d['V']=lV
-            d['ptc']=lptc
+            assert(np.isclose(pc-pcr,0).all())
+            d['V'] = lV
+            d['pc'] = lpc
+
         self.serialized=True
 
     def unserialize(self):
@@ -361,11 +353,11 @@ class Assembly(nx.DiGraph):
 
         for (n,d) in self.nodes(data=True):
             lV = d['V']
-            lptc = d['ptc']
+            lptc = d['pc']
             ptcr = np.array(eval(lptc))
             Vr = np.array(eval(lV)).reshape(3,3)
             d['V']=Vr
-            d['ptc']=ptcr
+            d['pc']=ptcr
         self.serialized=False
 
     def save_json(self):
@@ -435,14 +427,14 @@ class Assembly(nx.DiGraph):
             self.node[k]['V'] = V
             self.node[k]['name'] = name
             self.node[k]['sig'] = self.node[k]['pcloud'].sig
-            self.node[k]['vec'] = self.node[k]['pcloud'].vec
-            self.node[k]['ang'] = self.node[k]['pcloud'].ang
+            #self.node[k]['vec'] = self.node[k]['pcloud'].vec
+            #self.node[k]['ang'] = self.node[k]['pcloud'].ang
             shp = self.node[k]['shape']
             filename = name + ".stp"
             filename = os.path.join(subdirectory, filename)
             if not os.path.isfile(filename):
                 shp.translate(-pc)
-                shp.transform(V.T)
+                shp.unitary(V.T)
                 sol = cm.Solid([shp])
                 #if abs(ang)>0:
                 #    shp.rotate(np.array([0, 0, 0]), vec, ang)
@@ -463,7 +455,7 @@ def reverse(step_filename, view=False):
     """
 
     # read a step file and add nodes to graph
-    assembly = Assembly.from_step(step_filename, direct=False)
+    assembly = Assembly.from_step(step_filename, )
     # write a separate step file for each node
     assembly.write_components()
     # tag and analyze nodes - creates edges between nodes based
@@ -474,6 +466,10 @@ def reverse(step_filename, view=False):
     # join axiality precursor of co-axiality (alignment)
     #
     assembly.tag_nodes()
+    # assembly saving
+    assembly.save_gml()
+
+    assembly.save_json()
 
     if view:
         ccad_viewer = cd.view()

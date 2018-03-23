@@ -87,11 +87,38 @@ class PointCloud(object):
             st = st + 'ang : ' + str(self.ang) + '\n'
         return(st)
 
-    def mindist(self,otherpc):
+    def mindist(self,other):
+        """
+
+        Parameters
+        ----------
+
+        other : point cloud
+
+        """
+
         min_x = np.min(self.p[:,0])
-        min_x = np.min(self.p[:,0])
-        min_x = np.min(self.p[:,0])
-        min_x = np.min(self.p[:,0])
+        min_y = np.min(self.p[:,1])
+        min_z = np.min(self.p[:,2])
+        mino_x = np.min(other.p[:,0])
+        mino_y = np.min(other.p[:,1])
+        mino_z = np.min(other.p[:,2])
+
+        max_x = np.max(self.p[:,0])
+        max_y = np.max(self.p[:,1])
+        max_z = np.max(self.p[:,2])
+        maxo_x = np.max(other.p[:,0])
+        maxo_y = np.max(other.p[:,1])
+        maxo_z = np.max(other.p[:,2])
+
+        dx1 = mino_x - max_x
+        dx2 = min_x - maxo_x
+
+        dy1 = mino_y - max_y
+        dy2 = min_y - maxo_y
+
+        dz1 = mino_z - max_z
+        dz2 = min_z - maxo_z
 
     def centering(self):
         #
