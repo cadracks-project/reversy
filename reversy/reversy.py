@@ -271,7 +271,7 @@ class Assembly(nx.DiGraph):
 
             if lsamek==[]:
                 self.lsig.append(pcloudk.sig)
-                self.node[k]['name'] = pcloudk.sig
+                self.node[k]['name'] = pcloudk.name
                 self.node[k]['V'] = pcloudk.V
                 # self.node[k]['dim'] = dim
             else:
@@ -512,8 +512,8 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s :: %(levelname)6s :: '
                                '%(module)20s :: %(lineno)3d :: %(message)s')
-    filename = "../step/0_tabby2.stp"  # OCC compound
-    #filename = "../step/ASM0001_ASM_1_ASM.stp"  # OCC compound
+    #filename = "../step/0_tabby2.stp"  # OCC compound
+    filename = "../step/ASM0001_ASM_1_ASM.stp"  # OCC compound
     # filename = "../step/MOTORIDUTTORE_ASM.stp" # OCC compound
     #filename = "../step/aube_pleine.stp"  # OCC Solid
 
