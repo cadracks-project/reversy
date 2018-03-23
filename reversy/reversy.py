@@ -104,8 +104,8 @@ class Assembly(nx.DiGraph):
                 if ((shell.area()>0) and Npoints >=3):
                     pcloud.centering()
                     pcloud.ordering()
-                    self.add_node(nnode, pcloud=pcloud, shape=shell)
-                    self.pos[nnode] = shell.center()
+                    self.add_node(nnode, pcloud=pcloud, shape=solid)
+                    self.pos[nnode] = solid.center()
                     nnode += 1
 
     def __repr__(self):
@@ -434,10 +434,10 @@ class Assembly(nx.DiGraph):
             if not os.path.isfile(filename):
                 shp.translate(-pc)
                 shp.unitary(V.T)
-                sol = cm.Solid([shp])
+                #sol = cm.Solid([shp])
                 #if abs(ang)>0:
                 #    shp.rotate(np.array([0, 0, 0]), vec, ang)
-                sol.to_step(filename)
+                shp.to_step(filename)
 
 
 def reverse(step_filename, view=False):
