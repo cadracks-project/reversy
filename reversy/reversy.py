@@ -52,32 +52,21 @@ class Assembly(nx.DiGraph):
     __repr__
 
     """
-    def __init__(self, shape, origin=None, bclean=True):
-        """
-        Parameters
-        ----------
-
-        shape : cm.Shape  (single cm.Solid should be a compound)
-        origin : str
-            The file or script the assembly was created from
-        bclean : boolean
-            this indicates the provenance of the Assembly
-            + a graph file (clean)
-            + a step file (not clean)
-
-        """
-
+    def __init__(self):
         super(Assembly,self).__init__()
-        self.shape = shape
+        self.pos = dict()
+        self.serialized = False
+
+    def from_step(self, filename):
+        self.solid = from_step(filename)
+        self.isclean = False
         #
         # if it contains, An Assembly:
         # is clean : filename and transformation
         # is not clean : pointcloud and shape
         #
-        self.bclean = bclean
         #self.G = nx.DiGraph()
-        self.pos = dict()
-        self.origin = origin
+        self.origin = filename
         shells = self.shape.subshapes("Shell")
         logger.info("%i shells in assembly" % len(shells))
         nnode = 0
@@ -148,7 +137,7 @@ class Assembly(nx.DiGraph):
         node_size = 10
 
         #dlab = {k : str(int(np.ceil(self.node[k]['dim']))) for k in self.node.keys() if self.edge[k].keys()==[] }
-        dlab = {k : self.node[k]['pcloud'].sig for k in self.node.keys() }
+        dlab = {k : self.node[k]['sig'] for k in self.node.keys() }
 
         plt.figure(figsize=figsize)
         plt.suptitle(self.origin,fontsize=fontsize+2)
@@ -185,28 +174,6 @@ class Assembly(nx.DiGraph):
             plt.savefig(self.origin+'png')
         if bshow:
             plt.show()
-
-
-    @classmethod
-    def from_step(cls, filename):
-        r"""Create an Assembly instance from a STEP file
-
-        Parameters
-        ----------
-
-        filename : str
-            path to the STEP file
-        direct : bool, optional(default is False)
-            If True, directly use the point cloud of the Shell
-            If False, iterate the faces, wires and vertices
-
-        Returns
-        -------
-        Assembly : the new Assembly object created from a STEP file
-
-        """
-        solid = cm.from_step(filename)
-        return cls(solid, origin=filename,bclean = False)
 
     def tag_nodes(self):
         r"""Add computed data to each node of the assembly
@@ -370,7 +337,7 @@ class Assembly(nx.DiGraph):
             json.dump(data,fd)
         self.unserialize()
 
-    def load_json(self,filename):
+    def from_json(self,filename):
         """ load Assembly from json file
         """
         fd = open(filename,'r')
@@ -383,8 +350,9 @@ class Assembly(nx.DiGraph):
         self.edge = G.edge
         self.origin = filename
         self.unserialize()
+        # update nodes pos in graph
         for inode in self:
-            self.pos[inode] = self.node[inode]['ptc']
+            self.pos[inode] = self.node[inode]['pc']
 
     def save_gml(self):
         if not self.bclean:
@@ -439,6 +407,88 @@ class Assembly(nx.DiGraph):
                 #    shp.rotate(np.array([0, 0, 0]), vec, ang)
                 shp.to_step(filename)
 
+    def view(self,node_index=-1):
+        """
+
+        Parameters
+        ----------
+
+        node_index : a list of Assembly nodes (-1 : all nodes)
+
+        Notes
+        -----
+
+        An Assembly is a graph
+        Each node of an assembly has attached
+            + a filename describing a solid in its own local frame
+            + a translation vector for solid placement in the global frame
+
+        This function produces the view of the assemly in the global frame.
+
+        """
+        if type(node_index)==int:
+            if node_index==-1:
+                node_index = self.node.keys()
+            else:
+                node_index=[node_index]
+
+        assert(max(node_index)<=max(self.node.keys())),"Wrong node index"
+
+        if self.serialized:
+            s.unserialize()
+
+        # viewer initialisation
+        ccad_viewer = cd.view()
+        # get the list of all shape associated with Assembly x
+        #
+        # This is for debug purpose.
+        # In the final implementation.
+        # The assembly structure is not supposed to save shapes themselves
+        # but only references to files (.py or .step)
+        #
+        #lshapes1 = [x.node[k]['shape'] for k in node_index]
+        # get the list of all filename associated with Assembly x
+        lfiles = [str(self.node[k]['name'])+'.stp' for k in node_index]
+        # select directory where node files are saved
+        # temporary
+        #
+        fileorig = self.origin.replace('.json','')
+
+        rep = os.path.join('.',fileorig)
+
+        # get the local frame shapes from the list .step files
+        #lshapes2 = [cm.from_step(os.path.join(rep,s)) for s in lfiles]
+
+
+        # get unitary matrix and translation for global frame placement
+        lV   = [self.node[k]['V'] for k in node_index]
+        lptm = [self.node[k]['pc'] for k in node_index]
+        #lbmx = [x.node[k]['bmirrorx'] for k in node_index]
+        #
+        # iter on selected local shapes and apply the graph stored geometrical transformation sequence
+        # 1 : unitary transformation
+        # 2 : translation
+        #
+        solid = cm.Solid([])
+        for k,s in enumerate(lfiles):
+            filename = os.path.join(rep,s)
+            print(filename)
+            shp = cm.from_step(filename)
+            V = lV[k]
+            shp.unitary(V)
+            shp.translate(lptm[k])
+            shp.foreground=(1,1,0.5)
+            #print type(shp)
+            solid = solid + shp
+
+        # create a solid with the transformed shapes
+        #solid = cm.Solid(lshapes2)
+        ccad_viewer.set_background((0,0,0)) # White
+        ccad_viewer.display(solid,transparency=1,material='copper')
+        cd.start()
+        #return lshapes2,lV,lptm
+    #
+
 
 def reverse(step_filename, view=False):
     r"""Reverse STEP file using ccad
@@ -466,9 +516,9 @@ def reverse(step_filename, view=False):
     #
     assembly.tag_nodes()
     # assembly saving
-    #assembly.save_gml()
+    assembly.save_gml()
 
-    #assembly.save_json()
+    assembly.save_json()
 
     if view:
         ccad_viewer = cd.view()
@@ -517,5 +567,7 @@ if __name__ == "__main__":
     # filename = "../step/MOTORIDUTTORE_ASM.stp" # OCC compound
     #filename = "../step/aube_pleine.stp"  # OCC Solid
 
-    a1 = reverse(filename,view=False)
+    #a1 = reverse(filename,view=False)
+    a1 = Assembly()
+    a1.from_json(filename.replace('.stp','.json'))
     #cd.view(a1)
