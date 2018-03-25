@@ -103,8 +103,7 @@ class Assembly(nx.DiGraph):
         #st = self.shape.__repr__()+'\n'
         st = ''
         for k in self.node:
-            shp = self.get_node_solid(k)
-            st += self.node[k]['name']  + '  ' +str(shp.volume()) + '\n'
+            st += self.node[k]['name'] + '\n'
         return st
 
     def show_graph(self,**kwargs):
@@ -202,13 +201,13 @@ class Assembly(nx.DiGraph):
             self.lsig = []
             for k in self.node:
                  pcloudk = self.node[k]['pcloud']
-                 solidk = self.node[k]['shape']
                  mink = np.max(pcloudk.p,axis=0)
                  maxk = np.max(pcloudk.p,axis=0)
                  dk = pcloudk.dist
                  for j in range(k):
                     pcloudj = self.node[j]['pcloud']
-                    solidj = self.node[j]['shape']
+
+                    #print(k,j,dint[~bint])
                     dj = pcloudj.dist
                     # same number of points
                     if len(dk) == len(dj):
@@ -221,16 +220,16 @@ class Assembly(nx.DiGraph):
                         # Relation 1 : equal
                         #
                         if np.allclose(DEjk,0):
-                            # The two point clouds are equal w.r.t sorted points to origin distances
+                        # The two point clouds are equal w.r.t sorted points to origin distances
                             if self.edge[j].keys()==[]:
-                                self.add_edge(k,j,equal=True,close=True)
+                                self.add_edge(k,j,equal=True,sim=True)
                         #
                         # Relation 2 : almost equal
                         #
                         elif (rho1<0.01) and (rho2<0.05):
                             if self.edge[j].keys()==[]:
-                            # The two point clouds are closed w.r.t sorted point to origin distances
-                                self.add_edge(k,j,equal=False,close=True)
+                           # The two point clouds are closed w.r.t sorted point to origin distances
+                                self.add_edge(k,j,equal=False,sim=True)
 
 
             #
@@ -276,6 +275,26 @@ class Assembly(nx.DiGraph):
             # unique the list
             self.lsig = list(set(self.lsig))
             self.Nn = len(self.node)
+
+
+            # delete edges related to similarity
+            for ed in self.edges():
+                if self.edge[ed[0]][ed[1]].has_key('equal'):
+                    self.remove_edge(ed[0],ed[1])
+
+
+
+            for k in self.node:
+                 solidk = self.node[k]['shape']
+                 for j in range(k):
+                    solidj = self.node[j]['shape']
+                    bint,dint = intersect(solidk,solidj)
+                    dist = dint[~bint]
+                    if len(dist)==0:
+                        self.add_edge(k,j,intersect=True)
+                    elif len(dist)==1:
+                        if dist[0]<1:
+                            self.add_edge(k,j,close=True)
 
     def clean(self):
         """
@@ -520,7 +539,7 @@ class Assembly(nx.DiGraph):
             if shp.volume()<0:
                 shp.reverse()
             shp.translate(lptm[k])
-            #shp.foreground=(1,1,0.5)
+            #1hp.foreground=(1,1,0.5)
             #print type(shp)
             solid = solid + shp
         solid.to_html('assembly.html')
@@ -645,7 +664,9 @@ def intersect(s1,s2):
         Iz = (Intz1 | Intz2)
         gapz = Iz[1][0] -  Iz[0][1]
 
-    return (bx,by,bz),(gapx,gapy,gapz)
+    bint = np.array([bx,by,bz])
+    gapint =  np.array([gapx,gapy,gapz])
+    return bint, gapint
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG,
