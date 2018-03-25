@@ -21,8 +21,10 @@ from aocutils.display.wx_viewer import Wx3dViewer
 import matplotlib.pyplot as plt
 import numpy as np
 import networkx as nx
-import ccad.model as ccm
+import ccad.model as cm
 import pointcloud as pc
+from interval import interval
+#import pointcloud as pc
 logger = logging.getLogger('__name__')
 
 class Assembly(nx.DiGraph):
@@ -58,7 +60,7 @@ class Assembly(nx.DiGraph):
         self.serialized = False
 
     def from_step(self, filename):
-        self.solid = from_step(filename)
+        self.solid = cm.from_step(filename)
         self.isclean = False
         #
         # if it contains, An Assembly:
@@ -67,7 +69,7 @@ class Assembly(nx.DiGraph):
         #
         #self.G = nx.DiGraph()
         self.origin = filename
-        shells = self.shape.subshapes("Shell")
+        shells = self.solid.subshapes("Shell")
         logger.info("%i shells in assembly" % len(shells))
         nnode = 0
         for k, shell in enumerate(shells):
@@ -101,7 +103,8 @@ class Assembly(nx.DiGraph):
         #st = self.shape.__repr__()+'\n'
         st = ''
         for k in self.node:
-            st += self.node[k]['name']  +'\n'
+            shp = self.get_node_solid(k)
+            st += self.node[k]['name']  + '  ' +str(shp.volume()) + '\n'
         return st
 
     def show_graph(self,**kwargs):
@@ -195,81 +198,84 @@ class Assembly(nx.DiGraph):
         #       check if point cloud are equal
         #       check if point cloud are close
         # dist is the distance fingerprint
-        self.lsig = []
-        for k in self.node:
-             pcloudk = self.node[k]['pcloud']
-             mink = np.max(pcloudk.p,axis=0)
-             maxk = np.max(pcloudk.p,axis=0)
-             dk = pcloudk.dist
-             for j in range(k):
-                pcloudj = self.node[j]['pcloud']
-                dj = pcloudj.dist
-                # same number of points
-                if len(dk) == len(dj):
-                    Edn = np.sum(dk)
-                    Edj = np.sum(dj)
-                    rho1 = np.abs(Edn-Edj)/(Edn+Edj)
-                    DEjk = np.sum(np.abs(dk-dj))
-                    rho2 = DEjk/(Edn+Edj)
-                    #
-                    # Relation 1 : equal
-                    #
-                    if np.allclose(DEjk,0):
-                        # The two point clouds are equal w.r.t sorted points to origin distances
-                        if self.edge[j].keys()==[]:
-                            self.add_edge(k,j,equal=True,close=True)
-                    #
-                    # Relation 2 : almost equal
-                    #
-                    elif (rho1<0.01) and (rho2<0.05):
-                        if self.edge[j].keys()==[]:
-                        # The two point clouds are closed w.r.t sorted point to origin distances
-                            self.add_edge(k,j,equal=False,close=True)
+        if not self.isclean:
+            self.lsig = []
+            for k in self.node:
+                 pcloudk = self.node[k]['pcloud']
+                 solidk = self.node[k]['shape']
+                 mink = np.max(pcloudk.p,axis=0)
+                 maxk = np.max(pcloudk.p,axis=0)
+                 dk = pcloudk.dist
+                 for j in range(k):
+                    pcloudj = self.node[j]['pcloud']
+                    solidj = self.node[j]['shape']
+                    dj = pcloudj.dist
+                    # same number of points
+                    if len(dk) == len(dj):
+                        Edn = np.sum(dk)
+                        Edj = np.sum(dj)
+                        rho1 = np.abs(Edn-Edj)/(Edn+Edj)
+                        DEjk = np.sum(np.abs(dk-dj))
+                        rho2 = DEjk/(Edn+Edj)
+                        #
+                        # Relation 1 : equal
+                        #
+                        if np.allclose(DEjk,0):
+                            # The two point clouds are equal w.r.t sorted points to origin distances
+                            if self.edge[j].keys()==[]:
+                                self.add_edge(k,j,equal=True,close=True)
+                        #
+                        # Relation 2 : almost equal
+                        #
+                        elif (rho1<0.01) and (rho2<0.05):
+                            if self.edge[j].keys()==[]:
+                            # The two point clouds are closed w.r.t sorted point to origin distances
+                                self.add_edge(k,j,equal=False,close=True)
 
 
-        #
-        # once all edges are informed
-        #
-        self.lsig = []
-        for k in self.node:
-            pcloudk = self.node[k]['pcloud']
+            #
+            # once all edges are informed
+            #
+            self.lsig = []
+            for k in self.node:
+                pcloudk = self.node[k]['pcloud']
 
-            lsamek = [ x for x in self.edge[k].keys() if self.edge[k][x]['equal']]
+                lsamek = [ x for x in self.edge[k].keys() if self.edge[k][x]['equal']]
 
-            if lsamek==[]:
-                self.lsig.append(pcloudk.sig)
-                self.node[k]['name'] = pcloudk.name
+                if lsamek==[]:
+                    self.lsig.append(pcloudk.sig)
+                    self.node[k]['name'] = pcloudk.name
+                    self.node[k]['V'] = pcloudk.V
+                    # self.node[k]['dim'] = dim
+                else:
+                    refnode = [x for x in lsamek if self.edge[x].keys()==[]][0]
+                    self.node[k]['name'] = self.node[refnode]['name']
+                    pcsame = self.node[refnode]['pc']
+
+                    # self.node[k]['V']= self.node[refnode]['V']
+                    # self.node[k]['dim']= self.node[refnode]['dim']
+                    #
+                    # detection of eventual symmetry
+                    #
+                    # The symmetry is informed in the node
+                    #
+                    vec = np.abs(pcsame-pcloudk.pc)[None,:]
+                    dp = np.sum(vec,axis=0)
+                    nomirror = np.isclose(dp,0)
+                    if nomirror[0]==False:
+                        self.add_node(k,mx=True)
+                    if nomirror[1]==False:
+                        self.add_node(k,my=True)
+                    if nomirror[2]==False:
+                        self.add_node(k,mz=True)
+
                 self.node[k]['V'] = pcloudk.V
-                # self.node[k]['dim'] = dim
-            else:
-                refnode = [x for x in lsamek if self.edge[x].keys()==[]][0]
-                self.node[k]['name'] = self.node[refnode]['name']
-                pcsame = self.node[refnode]['pc']
+                self.node[k]['pc'] = pcloudk.pc
+                #self.node[k]['dim'] = int(np.ceil(dim))
 
-                # self.node[k]['V']= self.node[refnode]['V']
-                # self.node[k]['dim']= self.node[refnode]['dim']
-                #
-                # detection of eventual symmetry
-                #
-                # The symmetry is informed in the node
-                #
-                vec = np.abs(pcsame-pcloudk.pc)[None,:]
-                dp = np.sum(vec,axis=0)
-                nomirror = np.isclose(dp,0)
-                if nomirror[0]==False:
-                    self.add_node(k,mx=True)
-                if nomirror[1]==False:
-                    self.add_node(k,my=True)
-                if nomirror[2]==False:
-                    self.add_node(k,mz=True)
-
-            self.node[k]['V'] = pcloudk.V
-            self.node[k]['pc'] = pcloudk.pc
-            #self.node[k]['dim'] = int(np.ceil(dim))
-
-        # unique the list
-        self.lsig = list(set(self.lsig))
-        self.Nn = len(self.node)
+            # unique the list
+            self.lsig = list(set(self.lsig))
+            self.Nn = len(self.node)
 
     def clean(self):
         """
@@ -327,8 +333,9 @@ class Assembly(nx.DiGraph):
         self.serialized=False
 
     def save_json(self):
-        if not self.bclean:
-            self.clean
+        if not self.isclean:
+            self.clean()
+            self.isclean = True
         self.serialize()
         data = json_graph.node_link_data(self)
         filename = self.origin.replace('.stp','.json')
@@ -344,6 +351,7 @@ class Assembly(nx.DiGraph):
         data = json.load(fd)
         fd.close()
         G = json_graph.node_link_graph(data,directed=True)
+        self.isclean = True
         self.nodes = G.nodes
         self.edges = G.edges
         self.node = G.node
@@ -355,8 +363,9 @@ class Assembly(nx.DiGraph):
             self.pos[inode] = self.node[inode]['pc']
 
     def save_gml(self):
-        if not self.bclean:
+        if not self.isclean:
             self.clean()
+            self.isclean = True
         self.serialize()
         filename = self.origin.replace('.stp','.gml')
         nx.write_gml(self,filename)
@@ -407,6 +416,38 @@ class Assembly(nx.DiGraph):
                 #    shp.rotate(np.array([0, 0, 0]), vec, ang)
                 shp.to_step(filename)
 
+    def get_node_solid(self,inode):
+        """
+        Paramaters
+        ----------
+
+        inode : int
+
+        Returns
+        -------
+
+        s : node solid
+
+        # TODO : A terme On devrait pouvoir retourner un COMPSOLID ou un COMPOUND
+
+
+        """
+        fileorig = self.origin.replace('.json','')
+        name = self.node[inode]['name']+'.stp'
+        rep = os.path.join('.',fileorig)
+        # the str cast is required because unicode is unsupported
+        filename = str(os.path.join(rep,name))
+        # get shape
+        shp = cm.from_step(filename)
+        # get transform
+        V  = self.node[inode]['V']
+        pc = self.node[inode]['pc']
+        # apply transform
+        shp.unitary(V)
+        shp.translate(pc)
+        print(filename)
+        return shp
+
     def view(self,node_index=-1):
         """
 
@@ -438,7 +479,7 @@ class Assembly(nx.DiGraph):
             s.unserialize()
 
         # viewer initialisation
-        ccad_viewer = cd.view()
+        #ccad_viewer = cd.view()
         # get the list of all shape associated with Assembly x
         #
         # This is for debug purpose.
@@ -470,22 +511,25 @@ class Assembly(nx.DiGraph):
         # 2 : translation
         #
         solid = cm.Solid([])
+        #print('solid :', solid.volume())
         for k,s in enumerate(lfiles):
             filename = os.path.join(rep,s)
-            print(filename)
             shp = cm.from_step(filename)
             V = lV[k]
             shp.unitary(V)
+            if shp.volume()<0:
+                shp.reverse()
             shp.translate(lptm[k])
-            shp.foreground=(1,1,0.5)
+            #shp.foreground=(1,1,0.5)
             #print type(shp)
             solid = solid + shp
-
+        solid.to_html('assembly.html')
         # create a solid with the transformed shapes
         #solid = cm.Solid(lshapes2)
-        ccad_viewer.set_background((0,0,0)) # White
-        ccad_viewer.display(solid,transparency=1,material='copper')
-        cd.start()
+        #ccad_viewer.set_background((0,0,0)) # White
+        #ccad_viewer.display(solid,transparency=1,material='copper')
+        #cd.start()
+        return(lfiles,solid)
         #return lshapes2,lV,lptm
     #
 
@@ -504,7 +548,8 @@ def reverse(step_filename, view=False):
     """
 
     # read a step file and add nodes to graph
-    assembly = Assembly.from_step(step_filename, )
+    assembly = Assembly()
+    assembly.from_step(step_filename)
     # write a separate step file for each node
     assembly.write_components()
     # tag and analyze nodes - creates edges between nodes based
@@ -558,6 +603,50 @@ def view(step_filename):
     app.SetTopWindow(frame)
     app.MainLoop()
 
+def intersect(s1,s2):
+    """ Determine intersecton of 2 shape bounding boxes
+
+    Parameters
+    ----------
+    s1 : solid 1
+    s2 : solid 2
+
+    Returns
+    -------
+    boolean
+
+    """
+    bb1 = s1.bounding_box()
+    bb2 = s2.bounding_box()
+
+    Intx1 = interval([bb1[0,0],bb1[1,0]])
+    Inty1 = interval([bb1[0,1],bb1[1,1]])
+    Intz1 = interval([bb1[0,2],bb1[1,2]])
+
+    Intx2 = interval([bb2[0,0],bb2[1,0]])
+    Inty2 = interval([bb2[0,1],bb2[1,1]])
+    Intz2 = interval([bb2[0,2],bb2[1,2]])
+
+    bx = len(Intx1 & Intx2)>0
+    by = len(Inty1 & Inty2)>0
+    bz = len(Intz1 & Intz2)>0
+
+    gapx = 0
+    gapy = 0
+    gapz = 0
+
+    if not bx:
+        Ix = (Intx1 | Intx2)
+        gapx = Ix[1][0] - Ix[0][1]
+    if not by:
+        Iy = (Inty1 | Inty2)
+        gapy = Iy[1][0] - Iy[0][1]
+    if not bz:
+        Iz = (Intz1 | Intz2)
+        gapz = Iz[1][0] -  Iz[0][1]
+
+    return (bx,by,bz),(gapx,gapy,gapz)
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s :: %(levelname)6s :: '
@@ -567,7 +656,10 @@ if __name__ == "__main__":
     # filename = "../step/MOTORIDUTTORE_ASM.stp" # OCC compound
     #filename = "../step/aube_pleine.stp"  # OCC Solid
 
-    #a1 = reverse(filename,view=False)
-    a1 = Assembly()
-    a1.from_json(filename.replace('.stp','.json'))
+    a1 = reverse(filename,view=False)
+    #a1 = Assembly()
+    #a1.from_json(filename.replace('.stp','.json'))
+    ls = []
+    #for k in range(10):
+    #    ls.append(a1.get_node_solid(k))
     #cd.view(a1)
