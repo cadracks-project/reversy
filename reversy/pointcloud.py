@@ -190,7 +190,6 @@ class PointCloud(object):
         self.V = V
         self.U = U
         self.S = S
-        pdb.set_trace()
         # gravity center
         # q : quaternion from V
         #self.q = q
