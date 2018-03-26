@@ -172,13 +172,13 @@ class PointCloud(object):
         #vec, ang = q.vecang()
         #logger.debug("Vec : %s" % str(vec))
         #logger.debug("Ang : %f" % ang)
-        S0 = str(int(np.ceil(S[0]*100)))
-        S1 = str(int(np.ceil(S[1]*100)))
+        S0 = str(int(np.ceil(S[0])))
+        S1 = str(int(np.ceil(S[1])))
         if S[2]<1e-12:
             S2 = '0'
             name = getname(dimension=S0+'#'+S1+'#'+S2,function='SYMAX')
         else:
-            S2 = str(int(np.ceil(S[2]*100)))
+            S2 = str(int(np.ceil(S[2])))
             if S2=='1':
                 name = getname(dimension=S0+'#'+S1+'#'+S2,function='ALMSYM')
             else:

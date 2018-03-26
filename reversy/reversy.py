@@ -23,6 +23,7 @@ import numpy as np
 import networkx as nx
 import ccad.model as cm
 import pointcloud as pc
+import pandas as pd
 from interval import interval
 #import pointcloud as pc
 logger = logging.getLogger('__name__')
@@ -95,7 +96,7 @@ class Assembly(nx.DiGraph):
                 if ((shell.area()>0) and Npoints >=3):
                     pcloud.centering()
                     pcloud.ordering()
-                    self.add_node(nnode, pcloud=pcloud, shape=solid)
+                    self.add_node(nnode, pcloud=pcloud, shape=solid, volume=solid.volume())
                     self.pos[nnode] = solid.center()
                     nnode += 1
 
@@ -136,7 +137,7 @@ class Assembly(nx.DiGraph):
         dyz = { k : (self.pos[k][2],self.pos[k][1]) for k in self.node.keys() }
         dyzl = { k : (self.pos[k][2]+(v*np.random.rand()-v/2),self.pos[k][1]+(v*np.random.rand()-v/2.)) for k in self.node.keys() }
         #node_size = [ self.node[k]['dim'] for k in self.node.keys() ]
-        node_size = 10
+        node_size = [self.node[k]['volume']/1000. for k in self.node.keys()]
 
         #dlab = {k : str(int(np.ceil(self.node[k]['dim']))) for k in self.node.keys() if self.edge[k].keys()==[] }
         dlab = {k : self.node[k]['sig'] for k in self.node.keys() }
@@ -391,7 +392,7 @@ class Assembly(nx.DiGraph):
         self.unserialize()
 
     def write_components(self):
-        r"""Write components of the assembly
+        r"""Write individual components of the assembly
 
         Notes
         -----
@@ -412,6 +413,8 @@ class Assembly(nx.DiGraph):
             msg = "The components of the assembly should already exist"
             raise ValueError(msg)
 
+        self.df = pd.DataFrame(columns=('name','count','volume','sym'))
+
         for k in self.node:
             # calculate point cloud signature
             self.node[k]['pcloud'].signature()
@@ -422,18 +425,18 @@ class Assembly(nx.DiGraph):
             self.node[k]['V'] = V
             self.node[k]['name'] = name
             self.node[k]['sig'] = self.node[k]['pcloud'].sig
-            #self.node[k]['vec'] = self.node[k]['pcloud'].vec
-            #self.node[k]['ang'] = self.node[k]['pcloud'].ang
             shp = self.node[k]['shape']
             filename = name + ".stp"
             filename = os.path.join(subdirectory, filename)
+            # if the file is not existing yet then save it
+            # as a translated and unitary transformed version
             if not os.path.isfile(filename):
                 shp.translate(-pc)
                 shp.unitary(V.T)
-                #sol = cm.Solid([shp])
-                #if abs(ang)>0:
-                #    shp.rotate(np.array([0, 0, 0]), vec, ang)
                 shp.to_step(filename)
+                index = len(self.df)
+                self.df = self.df.set_value(index,'name',name)
+                self.df = self.df.set_value(index,'volume',shp.volume())
 
     def get_node_solid(self,inode):
         """
