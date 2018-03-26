@@ -1,0 +1,4 @@
+#!/bin/bash
+for k in *.stp;
+do python stp2html.py $k 1
+done

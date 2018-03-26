@@ -1,0 +1,4 @@
+#!/bin/bash
+rm -f *.html
+rm -f *.stp
+rm -f *.x3d

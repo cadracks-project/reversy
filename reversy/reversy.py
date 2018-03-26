@@ -410,7 +410,7 @@ class Assembly(nx.DiGraph):
             msg = "The components of the assembly should already exist"
             raise ValueError(msg)
 
-        self.df = pd.DataFrame(columns=('name','count','volume','sym'))
+        self.df = pd.DataFrame(columns=('name','count','nodes','volume','sym'))
 
         for k in self.node:
             # calculate point cloud signature
@@ -436,6 +436,14 @@ class Assembly(nx.DiGraph):
                 index = len(self.df)
                 self.df = self.df.set_value(index,'name',name)
                 self.df = self.df.set_value(index,'volume',shp.volume())
+                self.df = self.df.set_value(index,'count',1)
+                self.df = self.df.set_value(index,'nodes',[k])
+            else:
+                dfname = self.df[self.df['name']==name]
+                dfname['count'] = dfname['count'] + 1
+                dfname.iloc[0]['nodes'].append(k)
+                self.df[self.df['name']==name] = dfname
+
 
     def get_node_solid(self,inode):
         """
@@ -470,7 +478,7 @@ class Assembly(nx.DiGraph):
         return shp
 
     def view(self,node_index=-1):
-        """
+        """ view assembly (creates an html file)
 
         Parameters
         ----------
@@ -538,8 +546,9 @@ class Assembly(nx.DiGraph):
             shp = cm.from_step(filename)
             V = lV[k]
             shp.unitary(V)
-            if shp.volume()<0:
-                shp.reverse()
+            print(k,shp.volume())
+            #if shp.volume()<0:
+            #    shp.reverse()
             shp.translate(lptm[k])
             #1hp.foreground=(1,1,0.5)
             #print type(shp)
