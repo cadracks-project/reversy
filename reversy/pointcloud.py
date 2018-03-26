@@ -136,7 +136,7 @@ class PointCloud(object):
         # sorting points w.r.t distance to origin
         # This ordering is needed for PointClouds comparison
         #
-        d = np.sqrt(np.sum(self.p*self.p,axis=0))
+        d = np.sqrt(np.sum(self.p*self.p,axis=1))
         self.u = np.argsort(d)
         self.dist = d[self.u]
         self.p = self.p[self.u,:]
@@ -185,10 +185,12 @@ class PointCloud(object):
                 name = getname(dimension=S0+'#'+S1+'#'+S2)
 
         sig = S0 + "_" + S1 + "_" + S2
-        print(sig)
         self.sig = sig
         self.name = name
         self.V = V
+        self.U = U
+        self.S = S
+        pdb.set_trace()
         # gravity center
         # q : quaternion from V
         #self.q = q

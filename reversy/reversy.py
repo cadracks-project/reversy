@@ -317,14 +317,24 @@ class Assembly(nx.DiGraph):
         """
         for (n,d) in self.nodes(data=True):
             V = d['V']
+            U = d['U']
+            Npoints = d['Npoints']
+            S = d['S']
             pc = d['pc']
             lV = str(list((d['V'].ravel())))
+            lU = str(list((d['U'].ravel())))
+            lS = str(list((d['S'].ravel())))
             lpc = str(list((d['pc'])))
             pcr = np.array(eval(lpc))
             Vr = np.array(eval(lV)).reshape(3,3)
+            Ur = np.array(eval(lU)).reshape(Npoints,Npoints)
+            Sr = np.array(eval(lS))
             assert(np.isclose(V-Vr,0).all())
+            assert(np.isclose(U-Ur,0).all())
             assert(np.isclose(pc-pcr,0).all())
             d['V'] = lV
+            d['U'] = lU
+            d['S'] = lS
             d['pc'] = lpc
 
         self.serialized=True
@@ -342,11 +352,18 @@ class Assembly(nx.DiGraph):
 
         for (n,d) in self.nodes(data=True):
             lV = d['V']
+            lU = d['U']
+            lS = d['S']
+            Npoints = d['Npoints']
             lptc = d['pc']
             ptcr = np.array(eval(lptc))
             Vr = np.array(eval(lV)).reshape(3,3)
-            d['V']=Vr
-            d['pc']=ptcr
+            Ur = np.array(eval(lU)).reshape(Npoints,Npoints)
+            Sr = np.array(eval(lS))
+            d['V'] = Vr
+            d['U'] = Ur
+            d['S'] = Sr
+            d['pc'] = ptcr
         self.serialized=False
 
     def save_json(self):
@@ -417,9 +434,15 @@ class Assembly(nx.DiGraph):
             self.node[k]['pcloud'].signature()
             name = self.node[k]['pcloud'].name
             pc = self.node[k]['pcloud'].pc
+            U = self.node[k]['pcloud'].U
+            S = self.node[k]['pcloud'].S
             V = self.node[k]['pcloud'].V
+            Npoints = self.node[k]['pcloud'].Npoints
             self.node[k]['pc'] = pc
+            self.node[k]['U'] = U
+            self.node[k]['S'] = S
             self.node[k]['V'] = V
+            self.node[k]['Npoints'] =  Npoints
             self.node[k]['name'] = name
             self.node[k]['sig'] = self.node[k]['pcloud'].sig
             shp = self.node[k]['shape']
@@ -544,6 +567,7 @@ class Assembly(nx.DiGraph):
         for k,s in enumerate(lfiles):
             filename = os.path.join(rep,s)
             shp = cm.from_step(filename)
+            print(k,shp.volume())
             V = lV[k]
             shp.unitary(V)
             print(k,shp.volume())
@@ -591,8 +615,7 @@ def reverse(step_filename, view=False):
     #
     assembly.tag_nodes()
     # assembly saving
-    assembly.save_gml()
-
+    #assembly.save_gml()
     assembly.save_json()
 
     if view:
