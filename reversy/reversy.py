@@ -277,13 +277,10 @@ class Assembly(nx.DiGraph):
             self.lsig = list(set(self.lsig))
             self.Nn = len(self.node)
 
-
             # delete edges related to similarity
             for ed in self.edges():
                 if self.edge[ed[0]][ed[1]].has_key('equal'):
                     self.remove_edge(ed[0],ed[1])
-
-
 
             for k in self.node:
                  solidk = self.node[k]['shape']
@@ -433,6 +430,8 @@ class Assembly(nx.DiGraph):
             if not os.path.isfile(filename):
                 shp.translate(-pc)
                 shp.unitary(V.T)
+                if shp.volume()<0:
+                    shp.reverse()
                 shp.to_step(filename)
                 index = len(self.df)
                 self.df = self.df.set_value(index,'name',name)
@@ -454,9 +453,9 @@ class Assembly(nx.DiGraph):
 
 
         """
-        fileorig = self.origin.replace('.json','')
+        rep  = os.path.splitext(self.origin)[0]
         name = self.node[inode]['name']+'.stp'
-        rep = os.path.join('.',fileorig)
+        #rep = os.path.join('.',fileorig)
         # the str cast is required because unicode is unsupported
         filename = str(os.path.join(rep,name))
         # get shape
@@ -515,9 +514,9 @@ class Assembly(nx.DiGraph):
         # select directory where node files are saved
         # temporary
         #
-        fileorig = self.origin.replace('.json','')
+        rep = os.path.splitext(self.origin)[0]
 
-        rep = os.path.join('.',fileorig)
+        #rep = os.path.join('.',fileorig)
 
         # get the local frame shapes from the list .step files
         #lshapes2 = [cm.from_step(os.path.join(rep,s)) for s in lfiles]
