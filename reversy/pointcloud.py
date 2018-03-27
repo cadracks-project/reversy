@@ -128,7 +128,8 @@ class PointCloud(object):
         # centering
         #
         self.pc = np.mean(self.p, axis=0)
-        self.p= self.p - self.pc
+        self.p = self.p - self.pc
+        assert(self.p.shape[0]==self.Npoints)
         self.centered = True
 
     def ordering(self):
@@ -141,6 +142,7 @@ class PointCloud(object):
         self.dist = d[self.u]
         self.p = self.p[self.u,:]
         self.ordered = True
+        assert(self.p.shape[0]==self.Npoints), pdb.set_trace()
 
 
     def signature(self):
@@ -161,6 +163,14 @@ class PointCloud(object):
         #self.ordering()
 
         U, S, V = np.linalg.svd(self.p)
+
+        minx = np.min(self.p[:,0])
+        miny = np.min(self.p[:,1])
+        minz = np.min(self.p[:,2])
+        maxx = np.max(self.p[:,0])
+        maxy = np.max(self.p[:,1])
+        maxz = np.max(self.p[:,2])
+        bbc = np.array([maxx-minx,maxy-miny,maxz-minz])
         #logger.debug("U shape : %s" % str(U.shape))  # rotation matrix (nb_pts x nb_pts)
         #logger.debug("S shape : %s" % str(S.shape))  # Diagonal matrix (3d vec)
         #logger.debug(str(S))
@@ -172,24 +182,28 @@ class PointCloud(object):
         #vec, ang = q.vecang()
         #logger.debug("Vec : %s" % str(vec))
         #logger.debug("Ang : %f" % ang)
+        B0 = str(int(np.ceil(bbc[0])))
+        B1 = str(int(np.ceil(bbc[1])))
+        B2 = str(int(np.ceil(bbc[2])))
+
         S0 = str(int(np.ceil(S[0])))
         S1 = str(int(np.ceil(S[1])))
         if S[2]<1e-12:
             S2 = '0'
-            name = getname(dimension=S0+'#'+S1+'#'+S2,function='SYMAX')
+            sig = S0 + '#' + S1+ "#" + S2 + '_' + B0 + "#" + B1 + '#' + B2
+            name = getname(dimension=sig,function='SYMAX')
         else:
             S2 = str(int(np.ceil(S[2])))
+            sig = S0 + '#' + S1+ "#" + S2 + '_' + B0 + "#" + B1 + '#' + B2
             if S2=='1':
-                name = getname(dimension=S0+'#'+S1+'#'+S2,function='ALMSYM')
+                name = getname(dimension=sig,function='ALMSYM')
             else:
-                name = getname(dimension=S0+'#'+S1+'#'+S2)
+                name = getname(dimension=sig)
 
-        sig = S0 + "_" + S1 + "_" + S2
         self.sig = sig
         self.name = name
+        self.bbc = bbc
         self.V = V
-        self.U = U
-        self.S = S
         # gravity center
         # q : quaternion from V
         #self.q = q

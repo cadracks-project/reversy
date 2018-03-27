@@ -92,10 +92,10 @@ class Assembly(nx.DiGraph):
                 # add shape to graph if shell not degenerated
                 Npoints = pcloud.p.shape[0]
 
-
                 if ((shell.area()>0) and Npoints >=3):
                     pcloud.centering()
                     pcloud.ordering()
+                    # the stored point cloud is centered and ordered
                     self.add_node(nnode, pcloud=pcloud, shape=solid, volume=solid.volume())
                     self.pos[nnode] = solid.center()
                     nnode += 1
@@ -145,10 +145,14 @@ class Assembly(nx.DiGraph):
         plt.figure(figsize=figsize)
         plt.suptitle(self.origin,fontsize=fontsize+2)
         plt.subplot(2,2,1)
-        nx.draw_networkx_nodes(self,dxy,node_size=node_size,alpha=alpha)
-        nx.draw_networkx_edges(self,dxy)
+
+        nx.draw_networkx_nodes(self, dxy,node_size=node_size, alpha=alpha)
+        nx.draw_networkx_edges(self, dxy)
+
+        edgelist_close = [ (x,y) for (x,y) in self.edges() if self.edge[x][y]['close']] 
+        edgelist_intersect = [ (x,y) for (x,y) in self.edges() if self.edge[x][y]['intersect']] 
         if blabels:
-            nself.draw_networkx_labels(self,dxyl,labels=dlab,font_size=fontsize)
+            nx.draw_networkx_labels(self,dxyl,labels=dlab,font_size=fontsize)
         plt.xlabel('X axis (mm)',fontsize=fontsize)
         plt.ylabel('Y axis (mm)',fontsize=fontsize)
         plt.title("XY plane",fontsize=fontsize)
@@ -178,13 +182,13 @@ class Assembly(nx.DiGraph):
         if bshow:
             plt.show()
 
-    def tag_nodes(self):
-        r"""Add computed data to each node of the assembly
+    def equalsim_nodes_edges(self):
+        r""" connect equal and sim nodes
 
         self.node
             dim
             name
-            ptc
+            pc
             pcloud
             shape
             V
@@ -199,11 +203,12 @@ class Assembly(nx.DiGraph):
         #       check if point cloud are close
         # dist is the distance fingerprint
         if not self.isclean:
+            self.df_edges = pd.DataFrame(columns=('tail','head','equal','sim','intersect','close'))
             self.lsig = []
             for k in self.node:
                  pcloudk = self.node[k]['pcloud']
-                 mink = np.max(pcloudk.p,axis=0)
-                 maxk = np.max(pcloudk.p,axis=0)
+                 mink = np.max(pcloudk.p, axis=0)
+                 maxk = np.max(pcloudk.p, axis=0)
                  dk = pcloudk.dist
                  for j in range(k):
                     pcloudj = self.node[j]['pcloud']
@@ -223,7 +228,7 @@ class Assembly(nx.DiGraph):
                         if np.allclose(DEjk,0):
                         # The two point clouds are equal w.r.t sorted points to origin distances
                             if self.edge[j].keys()==[]:
-                                self.add_edge(k,j,equal=True,sim=True)
+                                self.add_edge(k, j, equal=True, sim=True, djk=DEjk)
                         #
                         # Relation 2 : almost equal
                         #
@@ -232,10 +237,6 @@ class Assembly(nx.DiGraph):
                            # The two point clouds are closed w.r.t sorted point to origin distances
                                 self.add_edge(k,j,equal=False,sim=True)
 
-
-            #
-            # once all edges are informed
-            #
             self.lsig = []
             for k in self.node:
                 pcloudk = self.node[k]['pcloud']
@@ -246,7 +247,6 @@ class Assembly(nx.DiGraph):
                     self.lsig.append(pcloudk.sig)
                     self.node[k]['name'] = pcloudk.name
                     self.node[k]['V'] = pcloudk.V
-                    # self.node[k]['dim'] = dim
                 else:
                     refnode = [x for x in lsamek if self.edge[x].keys()==[]][0]
                     self.node[k]['name'] = self.node[refnode]['name']
@@ -262,37 +262,43 @@ class Assembly(nx.DiGraph):
                     vec = np.abs(pcsame-pcloudk.pc)[None,:]
                     dp = np.sum(vec,axis=0)
                     nomirror = np.isclose(dp,0)
-                    if nomirror[0]==False:
-                        self.add_node(k,mx=True)
-                    if nomirror[1]==False:
-                        self.add_node(k,my=True)
-                    if nomirror[2]==False:
-                        self.add_node(k,mz=True)
+                    if nomirror[0] == False:
+                        self.add_node(k, mx=True)
+                    if nomirror[1] == False:
+                        self.add_node(k, my=True)
+                    if nomirror[2] == False:
+                        self.add_node(k, mz=True)
 
                 self.node[k]['V'] = pcloudk.V
                 self.node[k]['pc'] = pcloudk.pc
                 #self.node[k]['dim'] = int(np.ceil(dim))
 
-            # unique the list
-            self.lsig = list(set(self.lsig))
-            self.Nn = len(self.node)
+        # unique the list
+        self.lsig = list(set(self.lsig))
+        self.Nn = len(self.node)
 
-            # delete edges related to similarity
-            for ed in self.edges():
-                if self.edge[ed[0]][ed[1]].has_key('equal'):
-                    self.remove_edge(ed[0],ed[1])
+    def delete_edges(self,kind='equal'):
+        """
+        delete edges related to similarity
+        """
+        for ed in self.edges():
+            if self.edge[ed[0]][ed[1]].has_key(kind):
+                self.remove_edge(ed[0],ed[1])
 
-            for k in self.node:
-                 solidk = self.node[k]['shape']
-                 for j in range(k):
-                    solidj = self.node[j]['shape']
-                    bint,dint = intersect(solidk,solidj)
-                    dist = dint[~bint]
-                    if len(dist)==0:
-                        self.add_edge(k,j,intersect=True)
-                    elif len(dist)==1:
-                        if dist[0]<1:
-                            self.add_edge(k,j,close=True)
+    def intersect_nodes_edges(self):
+
+        for k in self.node:
+             solidk = self.get_node_solid(k)
+             for j in range(k):
+                solidj = self.get_node_solid(j)
+                bint,dint = intersect(solidk,solidj)
+                dist = dint[~bint]
+                if len(dist)==0:
+                    print(k,j,dist)
+                    self.add_edge(k,j,intersect=True,close=True)
+                elif len(dist)==1:
+                    if dist[0]<1:
+                        self.add_edge(k,j,close=True,intersect=False)
 
     def clean(self):
         """
@@ -317,24 +323,17 @@ class Assembly(nx.DiGraph):
         """
         for (n,d) in self.nodes(data=True):
             V = d['V']
-            U = d['U']
-            Npoints = d['Npoints']
-            S = d['S']
             pc = d['pc']
             lV = str(list((d['V'].ravel())))
-            lU = str(list((d['U'].ravel())))
-            lS = str(list((d['S'].ravel())))
             lpc = str(list((d['pc'])))
+
             pcr = np.array(eval(lpc))
             Vr = np.array(eval(lV)).reshape(3,3)
-            Ur = np.array(eval(lU)).reshape(Npoints,Npoints)
-            Sr = np.array(eval(lS))
-            assert(np.isclose(V-Vr,0).all())
-            assert(np.isclose(U-Ur,0).all())
-            assert(np.isclose(pc-pcr,0).all())
+
+            assert(np.isclose(V - Vr,0).all())
+            assert(np.isclose(pc - pcr,0).all())
+
             d['V'] = lV
-            d['U'] = lU
-            d['S'] = lS
             d['pc'] = lpc
 
         self.serialized=True
@@ -352,17 +351,10 @@ class Assembly(nx.DiGraph):
 
         for (n,d) in self.nodes(data=True):
             lV = d['V']
-            lU = d['U']
-            lS = d['S']
-            Npoints = d['Npoints']
             lptc = d['pc']
             ptcr = np.array(eval(lptc))
             Vr = np.array(eval(lV)).reshape(3,3)
-            Ur = np.array(eval(lU)).reshape(Npoints,Npoints)
-            Sr = np.array(eval(lS))
             d['V'] = Vr
-            d['U'] = Ur
-            d['S'] = Sr
             d['pc'] = ptcr
         self.serialized=False
 
@@ -396,6 +388,28 @@ class Assembly(nx.DiGraph):
         for inode in self:
             self.pos[inode] = self.node[inode]['pc']
 
+    def merge_nodes(self,lnodes):
+        """ merge a list of nodes into a sub Assembly
+        """
+
+        G = self.subgraph(lnodes)
+        pdb.set_trace()
+        pos = { x : self.pos[x] for x in lnodes }
+        # transcode node number
+        #lnodes_t = [ self.dnodes[x] for x in lnodes ]
+        #df_nodes = self.df_nodes.loc[lnodes_t]
+        A = Assembly()
+        A.add_nodes_from(G.nodes())
+        A.add_edges_from(G.edges())
+        A.node = G.node
+        #A.node = {x : self.node[x] for x in lnodes}
+        A.edge = G.edge
+        #A.edge = {x : self.edge[x] for x in A.edges()}
+        A.pos = pos
+        A.origin = self.origin
+        return(A)
+
+
     def save_gml(self):
         if not self.isclean:
             self.clean()
@@ -427,20 +441,22 @@ class Assembly(nx.DiGraph):
             msg = "The components of the assembly should already exist"
             raise ValueError(msg)
 
-        self.df = pd.DataFrame(columns=('name','count','nodes','volume','sym'))
 
+        filelist = [ f for f in os.listdir(subdirectory) if f.endswith(".stp") ]
+
+        for f in filelist:
+            os.remove(os.path.join(subdirectory,f))
+
+        self.df_nodes = pd.DataFrame(columns=('name','count','nodes','volume'))
+        self.dnodes ={}
         for k in self.node:
             # calculate point cloud signature
             self.node[k]['pcloud'].signature()
             name = self.node[k]['pcloud'].name
             pc = self.node[k]['pcloud'].pc
-            U = self.node[k]['pcloud'].U
-            S = self.node[k]['pcloud'].S
             V = self.node[k]['pcloud'].V
             Npoints = self.node[k]['pcloud'].Npoints
             self.node[k]['pc'] = pc
-            self.node[k]['U'] = U
-            self.node[k]['S'] = S
             self.node[k]['V'] = V
             self.node[k]['Npoints'] =  Npoints
             self.node[k]['name'] = name
@@ -453,19 +469,20 @@ class Assembly(nx.DiGraph):
             if not os.path.isfile(filename):
                 shp.translate(-pc)
                 shp.unitary(V.T)
-                if shp.volume()<0:
-                    shp.reverse()
+                #if shp.volume()<0:
+                #    shp.reverse()
                 shp.to_step(filename)
-                index = len(self.df)
-                self.df = self.df.set_value(index,'name',name)
-                self.df = self.df.set_value(index,'volume',shp.volume())
-                self.df = self.df.set_value(index,'count',1)
-                self.df = self.df.set_value(index,'nodes',[k])
+                index = len(self.df_nodes)
+                self.df_nodes = self.df_nodes.set_value(index,'name',name)
+                self.df_nodes = self.df_nodes.set_value(index,'volume',shp.volume())
+                self.df_nodes = self.df_nodes.set_value(index,'count',1)
+                self.df_nodes = self.df_nodes.set_value(index,'nodes',[k])
             else:
-                dfname = self.df[self.df['name']==name]
+                dfname = self.df_nodes[self.df_nodes['name']==name]
                 dfname['count'] = dfname['count'] + 1
                 dfname.iloc[0]['nodes'].append(k)
-                self.df[self.df['name']==name] = dfname
+                self.df_nodes[self.df_nodes['name']==name] = dfname
+            self.dnodes[k] = index
 
 
     def get_node_solid(self,inode):
@@ -497,7 +514,6 @@ class Assembly(nx.DiGraph):
         # apply transform
         shp.unitary(V)
         shp.translate(pc)
-        print(filename)
         return shp
 
     def view(self,node_index=-1):
@@ -554,8 +570,8 @@ class Assembly(nx.DiGraph):
 
 
         # get unitary matrix and translation for global frame placement
-        lV   = [self.node[k]['V'] for k in node_index]
-        lptm = [self.node[k]['pc'] for k in node_index]
+        lV  = [self.node[k]['V'] for k in node_index]
+        lpc = [self.node[k]['pc'] for k in node_index]
         #lbmx = [x.node[k]['bmirrorx'] for k in node_index]
         #
         # iter on selected local shapes and apply the graph stored geometrical transformation sequence
@@ -567,13 +583,11 @@ class Assembly(nx.DiGraph):
         for k,s in enumerate(lfiles):
             filename = os.path.join(rep,s)
             shp = cm.from_step(filename)
-            print(k,shp.volume())
             V = lV[k]
             shp.unitary(V)
-            print(k,shp.volume())
-            #if shp.volume()<0:
-            #    shp.reverse()
-            shp.translate(lptm[k])
+            if shp.volume()<0:
+                shp.reverse()
+            shp.translate(lpc[k])
             #1hp.foreground=(1,1,0.5)
             #print type(shp)
             solid = solid + shp
@@ -584,8 +598,6 @@ class Assembly(nx.DiGraph):
         #ccad_viewer.display(solid,transparency=1,material='copper')
         #cd.start()
         return(lfiles,solid)
-        #return lshapes2,lV,lptm
-    #
 
 
 def reverse(step_filename, view=False):
@@ -613,7 +625,9 @@ def reverse(step_filename, view=False):
     # proximity precursor of contact
     # join axiality precursor of co-axiality (alignment)
     #
-    assembly.tag_nodes()
+    assembly.equalsim_nodes_edges()
+    assembly.delete_edges(kind='equal')
+    assembly.intersect_nodes_edges()
     # assembly saving
     #assembly.save_gml()
     assembly.save_json()
@@ -657,10 +671,11 @@ def view(step_filename):
     app.MainLoop()
 
 def intersect(s1,s2):
-    """ Determine intersecton of 2 shape bounding boxes
+    """ Determine intersection of 2 shapes bounding boxes
 
     Parameters
     ----------
+
     s1 : solid 1
     s2 : solid 2
 
@@ -669,6 +684,7 @@ def intersect(s1,s2):
     boolean
 
     """
+
     bb1 = s1.bounding_box()
     bb2 = s2.bounding_box()
 
@@ -715,6 +731,11 @@ if __name__ == "__main__":
     #a1 = Assembly()
     #a1.from_json(filename.replace('.stp','.json'))
     ls = []
+    a1.view([1,7,9,3,5])
+    #s0 = a1.node[0]['shape']
+    #s1 = a1.node[1]['shape']
+    #s0.to_html('s0.html')
+    #s1.to_html('s1.html')
     #for k in range(10):
     #    ls.append(a1.get_node_solid(k))
     #cd.view(a1)
