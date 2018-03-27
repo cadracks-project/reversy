@@ -153,14 +153,14 @@ class Assembly(nx.DiGraph):
         edgelist_intersect = [ (x,y) for (x,y) in self.edges() if self.edge[x][y]['intersect']] 
         if blabels:
             nx.draw_networkx_labels(self,dxyl,labels=dlab,font_size=fontsize)
-        plt.xlabel('X axis (mm)',fontsize=fontsize)
-        plt.ylabel('Y axis (mm)',fontsize=fontsize)
-        plt.title("XY plane",fontsize=fontsize)
+        plt.xlabel('X axis (mm)', fontsize=fontsize)
+        plt.ylabel('Y axis (mm)', fontsize=fontsize)
+        plt.title("XY plane", fontsize=fontsize)
         plt.subplot(2,2,2)
-        nx.draw_networkx_nodes(self,dyz,node_size=node_size,alpha=alpha)
-        nx.draw_networkx_edges(self,dyz)
+        nx.draw_networkx_nodes(self, dyz,node_size=node_size, alpha=alpha)
+        nx.draw_networkx_edges(self, dyz)
         if blabels:
-            nx.draw_networkx_labels(self,dyzl,labels=dlab,font_size=fontsize)
+            nx.draw_networkx_labels(self, dyzl, labels=dlab, font_size=fontsize)
         plt.xlabel('Z axis (mm)',fontsize=fontsize)
         plt.ylabel('Y axis (mm)',fontsize=fontsize)
         plt.title("ZY plane",fontsize=fontsize)
@@ -278,9 +278,14 @@ class Assembly(nx.DiGraph):
         self.Nn = len(self.node)
 
     def delete_edges(self,kind='equal'):
+        """ delete edges of a specific kind
+
+        Parameters
+        ----------
+        kind : string
+
         """
-        delete edges related to similarity
-        """
+
         for ed in self.edges():
             if self.edge[ed[0]][ed[1]].has_key(kind):
                 self.remove_edge(ed[0],ed[1])
@@ -288,9 +293,9 @@ class Assembly(nx.DiGraph):
     def intersect_nodes_edges(self):
 
         for k in self.node:
-             solidk = self.get_node_solid(k)
+             solidk = self.get_solid_from_nodes([k])
              for j in range(k):
-                solidj = self.get_node_solid(j)
+                solidj = self.get_solid_from_nodes([j])
                 bint,dint = intersect(solidk,solidj)
                 dist = dint[~bint]
                 if len(dist)==0:
@@ -358,13 +363,18 @@ class Assembly(nx.DiGraph):
             d['pc'] = ptcr
         self.serialized=False
 
-    def save_json(self):
+    def save_json(self,filename=''):
         if not self.isclean:
             self.clean()
             self.isclean = True
         self.serialize()
         data = json_graph.node_link_data(self)
-        filename = self.origin.replace('.stp','.json')
+        rep = os.path.dirname(self.origin)
+        basename = os.path.basename(self.origin)
+        rep = os.path.join(rep,os.path.splitext(basename)[0])
+        if filename=='':
+            filename = os.path.splitext(basename)[0]+'.json'
+        filename = os.path.join(rep,filename)
         fd = open(filename,'w')
         with fd:
             json.dump(data,fd)
@@ -388,12 +398,12 @@ class Assembly(nx.DiGraph):
         for inode in self:
             self.pos[inode] = self.node[inode]['pc']
 
-    def merge_nodes(self,lnodes):
+    def merge_nodes(self,lnodes,filename='test.json'):
         """ merge a list of nodes into a sub Assembly
+
         """
 
         G = self.subgraph(lnodes)
-        pdb.set_trace()
         pos = { x : self.pos[x] for x in lnodes }
         # transcode node number
         #lnodes_t = [ self.dnodes[x] for x in lnodes ]
@@ -402,11 +412,18 @@ class Assembly(nx.DiGraph):
         A.add_nodes_from(G.nodes())
         A.add_edges_from(G.edges())
         A.node = G.node
-        #A.node = {x : self.node[x] for x in lnodes}
         A.edge = G.edge
-        #A.edge = {x : self.edge[x] for x in A.edges()}
         A.pos = pos
         A.origin = self.origin
+        A.isclean = self.isclean
+        A.save_json(filename)
+        # create solid from nodes
+        # create point cloud from solid 
+        # record all nodes connected to lnods not in lnodes
+
+        # delete nodes from lnodes
+        #self.remove_nodes_from(lnodes)
+        # 
         return(A)
 
 
@@ -485,9 +502,10 @@ class Assembly(nx.DiGraph):
             self.dnodes[k] = index
 
 
-    def get_node_solid(self,inode):
-        """
-        Paramaters
+    def get_solid_from_nodes(self,lnodes):
+        """ get a solid from nodes
+
+        Parameters
         ----------
 
         inode : int
@@ -501,20 +519,23 @@ class Assembly(nx.DiGraph):
 
 
         """
+
         rep  = os.path.splitext(self.origin)[0]
-        name = self.node[inode]['name']+'.stp'
-        #rep = os.path.join('.',fileorig)
-        # the str cast is required because unicode is unsupported
-        filename = str(os.path.join(rep,name))
-        # get shape
-        shp = cm.from_step(filename)
-        # get transform
-        V  = self.node[inode]['V']
-        pc = self.node[inode]['pc']
-        # apply transform
-        shp.unitary(V)
-        shp.translate(pc)
-        return shp
+        lfiles = [str(self.node[k]['name'])+'.stp' for k in lnodes]
+        lV  = [ self.node[k]['V'] for k in lnodes ]
+        lpc = [ self.node[k]['pc'] for k in lnodes ]
+        solid = cm.Solid([])
+        for k,s in enumerate(lfiles):
+            filename = os.path.join(rep,s)
+            shp = cm.from_step(filename)
+            V = lV[k]
+            shp.unitary(V)
+            if shp.volume()<0:
+                shp.reverse()
+            shp.translate(lpc[k])
+            solid = solid + shp
+
+        return solid
 
     def view(self,node_index=-1):
         """ view assembly (creates an html file)
@@ -532,7 +553,7 @@ class Assembly(nx.DiGraph):
             + a filename describing a solid in its own local frame
             + a translation vector for solid placement in the global frame
 
-        This function produces the view of the assemly in the global frame.
+        This function produces the view of the assembly in the global frame.
 
         """
         if type(node_index)==int:
@@ -546,58 +567,11 @@ class Assembly(nx.DiGraph):
         if self.serialized:
             s.unserialize()
 
-        # viewer initialisation
-        #ccad_viewer = cd.view()
-        # get the list of all shape associated with Assembly x
-        #
-        # This is for debug purpose.
-        # In the final implementation.
-        # The assembly structure is not supposed to save shapes themselves
-        # but only references to files (.py or .step)
-        #
-        #lshapes1 = [x.node[k]['shape'] for k in node_index]
-        # get the list of all filename associated with Assembly x
-        lfiles = [str(self.node[k]['name'])+'.stp' for k in node_index]
-        # select directory where node files are saved
-        # temporary
-        #
-        rep = os.path.splitext(self.origin)[0]
+        solid = self.get_solid_from_nodes(node_index)
 
-        #rep = os.path.join('.',fileorig)
-
-        # get the local frame shapes from the list .step files
-        #lshapes2 = [cm.from_step(os.path.join(rep,s)) for s in lfiles]
-
-
-        # get unitary matrix and translation for global frame placement
-        lV  = [self.node[k]['V'] for k in node_index]
-        lpc = [self.node[k]['pc'] for k in node_index]
-        #lbmx = [x.node[k]['bmirrorx'] for k in node_index]
-        #
-        # iter on selected local shapes and apply the graph stored geometrical transformation sequence
-        # 1 : unitary transformation
-        # 2 : translation
-        #
-        solid = cm.Solid([])
-        #print('solid :', solid.volume())
-        for k,s in enumerate(lfiles):
-            filename = os.path.join(rep,s)
-            shp = cm.from_step(filename)
-            V = lV[k]
-            shp.unitary(V)
-            if shp.volume()<0:
-                shp.reverse()
-            shp.translate(lpc[k])
-            #1hp.foreground=(1,1,0.5)
-            #print type(shp)
-            solid = solid + shp
         solid.to_html('assembly.html')
-        # create a solid with the transformed shapes
-        #solid = cm.Solid(lshapes2)
-        #ccad_viewer.set_background((0,0,0)) # White
-        #ccad_viewer.display(solid,transparency=1,material='copper')
-        #cd.start()
-        return(lfiles,solid)
+
+        return solid
 
 
 def reverse(step_filename, view=False):

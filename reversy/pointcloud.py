@@ -171,6 +171,7 @@ class PointCloud(object):
         maxy = np.max(self.p[:,1])
         maxz = np.max(self.p[:,2])
         bbc = np.array([maxx-minx,maxy-miny,maxz-minz])
+
         #logger.debug("U shape : %s" % str(U.shape))  # rotation matrix (nb_pts x nb_pts)
         #logger.debug("S shape : %s" % str(S.shape))  # Diagonal matrix (3d vec)
         #logger.debug(str(S))
