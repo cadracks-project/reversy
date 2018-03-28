@@ -113,7 +113,7 @@ class Assembly(nx.DiGraph):
         assert(x in self.node for x in lnodes)
         self.remove_nodes_from(lnodes)
         [ self.pos.pop(x) for x in lnodes ]
-        self.nnodes = self.nnodes - len(lnodes) 
+        self.nnodes = len(self.node)
 
     def show_graph(self,**kwargs):
         """ show an assembly graph
@@ -446,10 +446,10 @@ class Assembly(nx.DiGraph):
         filename = pcloud.sig + '.json'
         A.save_json(filename)
         # add new assembly node
-        new_node = self.nnodes
+        new_node = max(self.node.keys()) + 1
         self.add_node(new_node,name=filename)
         self.nnodes = self.nnodes + 1
-        self.pos[new_node] = pcloud.center()
+        self.pos[new_node] = pcloud.pc
 
         # connect assembly nodes to valid nodes
         for n in lvalid:

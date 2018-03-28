@@ -137,6 +137,7 @@ class PointCloud(object):
     def center(self):
         if not self.centered:
             self.pc = np.mean(self.p, axis=0)
+            return self.pc
 
     def centering(self):
         #
