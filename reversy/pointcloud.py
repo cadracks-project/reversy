@@ -134,6 +134,10 @@ class PointCloud(object):
         dz1 = mino_z - max_z
         dz2 = min_z - maxo_z
 
+    def center(self):
+        if not self.centered:
+            self.pc = np.mean(self.p, axis=0)
+
     def centering(self):
         #
         # centering

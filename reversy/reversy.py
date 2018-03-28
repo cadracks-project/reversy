@@ -73,7 +73,7 @@ class Assembly(nx.DiGraph):
         self.origin = filename
         shells = self.solid.subshapes("Shell")
         logger.info("%i shells in assembly" % len(shells))
-        nnode = 0
+        self.nnodes = 0
         for k, shell in enumerate(shells):
             solid = cm.Solid([shell])
             # check the shell coresponds to a cosed solid
@@ -98,16 +98,22 @@ class Assembly(nx.DiGraph):
                     pcloud.centering()
                     pcloud.ordering()
                     # the stored point cloud is centered and ordered
-                    self.add_node(nnode, pcloud=pcloud, shape=solid, volume=solid.volume())
-                    self.pos[nnode] = solid.center()
-                    nnode += 1
+                    self.add_node(self.nnodes, pcloud=pcloud, shape=solid, volume=solid.volume())
+                    self.pos[self.nnodes] = solid.center()
+                    self.nnodes += 1
 
     def __repr__(self):
         #st = self.shape.__repr__()+'\n'
-        st = ''
+        st = str(self.nnodes)+ ' nodes' + '\n'
         for k in self.node:
             st += self.node[k]['name'] + '\n'
         return st
+
+    def remove_nodes(self,lnodes):
+        assert(x in self.node for x in lnodes)
+        self.remove_nodes_from(lnodes)
+        [ self.pos.pop(x) for x in lnodes ]
+        self.nnodes = self.nnodes - len(lnodes) 
 
     def show_graph(self,**kwargs):
         """ show an assembly graph
@@ -424,16 +430,32 @@ class Assembly(nx.DiGraph):
         A.isclean = self.isclean
         # create a solid from nodes
         solid = self.get_solid_from_nodes(lnodes)
+        #A.save_json(filename)
+        # find all nodes connected to lnodes not in lnodes
+        lneighbors =[]
+        for n in lnodes:
+            l = self[n].keys()
+            lneighbors.extend(l)
+        lneighbors = list(set(lneighbors))
+        lvalid = [ x for x in lneighbors if x not in lnodes ]
         # create point cloud from solid
         pcloud = pc.PointCloud()
-        #A.save_json(filename)
-        # record all nodes connected to lnodes not in lnodes
         pcloud = pcloud.from_solid(solid)
+        # get point cloud signature
         pcloud.signature()
         filename = pcloud.sig + '.json'
         A.save_json(filename)
+        # add new assembly node
+        new_node = self.nnodes
+        self.add_node(new_node,name=filename)
+        self.nnodes = self.nnodes + 1
+        self.pos[new_node] = pcloud.center()
+
+        # connect assembly nodes to valid nodes
+        for n in lvalid:
+            self.add_edge(new_node,n)
         # delete nodes from lnodes
-        #self.remove_nodes_from(lnodes)
+        self.remove_nodes(lnodes)
         #
         return(A)
 
