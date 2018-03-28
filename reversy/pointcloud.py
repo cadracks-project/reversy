@@ -65,6 +65,8 @@ class PointCloud(object):
         assert(p.shape[1]==ndim)
         self.Npoints = p.shape[0]
         self.p = p
+        self.centered = False
+        self.ordered = False
 
     def __add__(self,p):
         P = PointCloud()
@@ -88,13 +90,14 @@ class PointCloud(object):
             st = st + 'pc : ' + str(self.pc) + '\n'
         if hasattr(self,'V'):
             st = st + 'V : ' + str(self.V) + '\n'
-        return(st)
+        return st
 
     def from_solid(self,solid):
         vertices = solid.subshapes("Vertex")
         for vertex in vertices:
             point = np.array(vertex.center())[:, None]
             self = self + point
+        return self
 
     def mindist(self,other):
         """

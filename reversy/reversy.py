@@ -82,14 +82,14 @@ class Assembly(nx.DiGraph):
                 #pcloud = np.array([[]])
                 #pcloud.shape = (3, 0)
                 pcloud = pc.PointCloud()
-                pcloud.from_solid(solid)
+                pcloud = pcloud.from_solid(solid)
 
 
                 #vertices = shell.subshapes("Vertex")
                 #logger.info("%i vertices found for direct method")
                 #for vertex in vertices:
                 #    point = np.array(vertex.center())[:, None]
-                #    pcloud = np.append(pcloud, point, axis=1)
+                    #pcloud = np.append(pcloud, point, axis=1)
                 #    pcloud = pcloud + point
                 # add shape to graph if shell not degenerated
                 Npoints = pcloud.p.shape[0]
@@ -526,6 +526,13 @@ class Assembly(nx.DiGraph):
 
         # TODO : A terme On devrait pouvoir retourner un COMPSOLID ou un COMPOUND
 
+        Notes
+        -----
+
+        If the assembly file has extension .stp it meas that the analysis has
+        not been done. After the analysis a directory has been created, it
+        contains all the .stp file of the parts and a .json file which contains
+        the graph information.
 
         """
         ext = os.path.splitext(self.origin)[1]
@@ -533,11 +540,12 @@ class Assembly(nx.DiGraph):
             rep  = os.path.splitext(self.origin)[0]
         else:
             rep  = os.path.dirname(self.origin)
+
         lfiles = [str(self.node[k]['name'])+'.stp' for k in lnodes]
         lV  = [ self.node[k]['V'] for k in lnodes ]
         lpc = [ self.node[k]['pc'] for k in lnodes ]
         solid = cm.Solid([])
-        pdb.set_trace()
+
         for k,s in enumerate(lfiles):
             filename = os.path.join(rep,s)
             shp = cm.from_step(filename)
@@ -715,15 +723,14 @@ if __name__ == "__main__":
     #filename = "../step/0_tabby2.stp"  # OCC compound
     filename = "../step/ASM0001_ASM_1_ASM.stp"  # OCC compound
     #filename = "../step/arduino.stp"  # OCC compound
-    # filename = "../step/MOTORIDUTTORE_ASM.stp" # OCC compound
+    #filename = "../step/MOTORIDUTTORE_ASM.stp" # OCC compound
     #filename = "../step/aube_pleine.stp"  # OCC Solid
-
-    #a1 = reverse(filename,view=False)
-    a1 = Assembly()
-    basename = os.path.basename(filename)
-    rep = os.path.join(os.path.dirname(filename),os.path.splitext(basename)[0])
-    filename = os.path.join(rep,os.path.splitext(basename)[0]+'.json')
-    a1.from_json(filename)
+    a1 = reverse(filename,view=False)
+    #a1 = Assembly()
+    #basename = os.path.basename(filename)
+    #rep = os.path.join(os.path.dirname(filename),os.path.splitext(basename)[0])
+    #filename = os.path.join(rep,os.path.splitext(basename)[0]+'.json')
+    #a1.from_json(filename)
     #ls = []
     #a1.view([1,7,9,3,5])
     #s0 = a1.node[0]['shape']

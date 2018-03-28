@@ -2,6 +2,8 @@ ISO-10303-21;
 HEADER;
 
 FILE_DESCRIPTION(
+/* description */ (''),
+/* implementation_level */ '2;1');
 
 FILE_NAME('ASM0001_ASM_1_ASM.stp','Sun Jun  5 22:04:20 2016',(''),('OSV Documentation'),'','','');
 
