@@ -84,13 +84,13 @@ class Assembly(nx.DiGraph):
                 #pcloud.shape = (3, 0)
                 pcloud = pc.PointCloud()
 
+
                 vertices = shell.subshapes("Vertex")
                 logger.info("%i vertices found for direct method")
                 for vertex in vertices:
                     point = np.array(vertex.center())[:, None]
                     #pcloud = np.append(pcloud, point, axis=1)
                     pcloud = pcloud + point
-
                 # add shape to graph if shell not degenerated
                 Npoints = pcloud.p.shape[0]
 
@@ -426,8 +426,9 @@ class Assembly(nx.DiGraph):
         # create a solid from nodes
         solid = self.get_solid_from_nodes(lnodes)
         # create point cloud from solid
+        pcloud = pc.PointCloud()
         # record all nodes connected to lnods not in lnodes
-
+        pcloud.from_solid(solid)
         # delete nodes from lnodes
         #self.remove_nodes_from(lnodes)
         # 

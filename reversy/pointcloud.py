@@ -68,7 +68,7 @@ class PointCloud(object):
 
     def __add__(self,p):
         P = PointCloud()
-        if p.shape[1]!=self.ndim:
+        if p.shape[1] != self.ndim:
             P.p = np.vstack((self.p,p.T))
         else:
             P.p = np.vstack((self.p,p))
@@ -89,6 +89,12 @@ class PointCloud(object):
         if hasattr(self,'V'):
             st = st + 'V : ' + str(self.V) + '\n'
         return(st)
+
+    def from_solid(self,solid):
+        vertices = solid.subshapes("Vertex")
+        for vertex in vertices:
+            point = np.array(vertex.center())[:, None]
+            self = self + point
 
     def mindist(self,other):
         """
