@@ -149,14 +149,17 @@ class Assembly(nx.DiGraph):
         nx.draw_networkx_nodes(self, dxy,node_size=node_size, alpha=alpha)
         nx.draw_networkx_edges(self, dxy)
 
-        edgelist_close = [ (x,y) for (x,y) in self.edges() if self.edge[x][y]['close']] 
-        edgelist_intersect = [ (x,y) for (x,y) in self.edges() if self.edge[x][y]['intersect']] 
+        #edgelist_close = [ (x,y) for (x,y) in self.edges() if self.edge[x][y]['close']]
+        #edgelist_intersect = [ (x,y) for (x,y) in self.edges() if self.edge[x][y]['intersect']]
+
         if blabels:
             nx.draw_networkx_labels(self,dxyl,labels=dlab,font_size=fontsize)
+
         plt.xlabel('X axis (mm)', fontsize=fontsize)
         plt.ylabel('Y axis (mm)', fontsize=fontsize)
         plt.title("XY plane", fontsize=fontsize)
         plt.subplot(2,2,2)
+
         nx.draw_networkx_nodes(self, dyz,node_size=node_size, alpha=alpha)
         nx.draw_networkx_edges(self, dyz)
         if blabels:
@@ -164,6 +167,7 @@ class Assembly(nx.DiGraph):
         plt.xlabel('Z axis (mm)',fontsize=fontsize)
         plt.ylabel('Y axis (mm)',fontsize=fontsize)
         plt.title("ZY plane",fontsize=fontsize)
+
         plt.subplot(2,2,3)
         nx.draw_networkx_nodes(self,dxz,node_size=node_size,alpha=alpha)
         nx.draw_networkx_edges(self,dxz)
@@ -418,7 +422,8 @@ class Assembly(nx.DiGraph):
         A.isclean = self.isclean
         A.save_json(filename)
         # create solid from nodes
-        # create point cloud from solid 
+        solid = cm.get_solid_from_nodes(lnodes)
+        # create point cloud from solid
         # record all nodes connected to lnods not in lnodes
 
         # delete nodes from lnodes
