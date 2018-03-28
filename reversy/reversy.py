@@ -16,6 +16,8 @@ from os import path as _path
 from osvcad.nodes import AssemblyGeometryNode
 import ccad.model as cm
 import ccad.display as cd
+from OCC.Display.WebGl import threejs_renderer
+from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeTorus
 from aocxchange.step import StepImporter
 from aocutils.display.wx_viewer import Wx3dViewer
 import matplotlib.pyplot as plt
@@ -421,8 +423,8 @@ class Assembly(nx.DiGraph):
         A.origin = self.origin
         A.isclean = self.isclean
         A.save_json(filename)
-        # create solid from nodes
-        solid = cm.get_solid_from_nodes(lnodes)
+        # create a solid from nodes
+        solid = self.get_solid_from_nodes(lnodes)
         # create point cloud from solid
         # record all nodes connected to lnods not in lnodes
 
@@ -574,7 +576,10 @@ class Assembly(nx.DiGraph):
 
         solid = self.get_solid_from_nodes(node_index)
 
-        solid.to_html('assembly.html')
+        #solid.to_html('assembly.html')
+        my_renderer = threejs_renderer.ThreejsRenderer()
+        my_renderer.DisplayShape(solid.shape)
+        my_renderer.render()
 
         return solid
 
