@@ -1,6 +1,8 @@
 import numpy as np
 import scipy.spatial as spa
 import quaternions as cq
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
 import os
 import sys
 import json
@@ -220,5 +222,17 @@ class PointCloud(object):
         # vec :  rotation axis
         #self.vec = vec
         #self.ang = ang
+    def show(self):
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        c = 'b'
+        m = 'o' # '^'
+        ax.scatter(self.p[:,0], self.p[:,1], self.p[:,2], c=c, marker=m)
 
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+
+        plt.show()
+        return fig,ax
 

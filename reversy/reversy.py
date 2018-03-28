@@ -43,9 +43,9 @@ class Assembly(nx.DiGraph):
     A node has the following attributes :
 
     'name' : name of the origin file (step file or python file)
-        'V' : a unitary matrix
-        'dim' : a dimension integer
-        'ptc' : a translation vector
+    'dim' : a dimension integer
+    'pc' : a translation vector
+    'V' : a unitary matrix
 
     Methods
     -------
@@ -427,12 +427,14 @@ class Assembly(nx.DiGraph):
         # create point cloud from solid
         pcloud = pc.PointCloud()
         #A.save_json(filename)
-        # record all nodes connected to lnods not in lnodes
-        pcloud.from_solid(solid)
+        # record all nodes connected to lnodes not in lnodes
+        pcloud = pcloud.from_solid(solid)
         pcloud.signature()
+        filename = pcloud.sig + '.json'
+        A.save_json(filename)
         # delete nodes from lnodes
         #self.remove_nodes_from(lnodes)
-        # 
+        #
         return(A)
 
 
