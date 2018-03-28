@@ -17,7 +17,6 @@ from osvcad.nodes import AssemblyGeometryNode
 import ccad.model as cm
 import ccad.display as cd
 from OCC.Display.WebGl import threejs_renderer
-from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeTorus
 from aocxchange.step import StepImporter
 from aocutils.display.wx_viewer import Wx3dViewer
 import matplotlib.pyplot as plt
@@ -429,6 +428,7 @@ class Assembly(nx.DiGraph):
         pcloud = pc.PointCloud()
         # record all nodes connected to lnods not in lnodes
         pcloud.from_solid(solid)
+        pcloud.signature()
         # delete nodes from lnodes
         #self.remove_nodes_from(lnodes)
         # 
