@@ -1,6 +1,5 @@
 import numpy as np
 import scipy.spatial as spa
-import quaternions as cq
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import os
@@ -167,7 +166,6 @@ class PointCloud(object):
         sig : str
         V   :
         pc : middle point / centroid of the point cloud
-        q : quaternion from V
         vec
         ang
 
@@ -188,17 +186,6 @@ class PointCloud(object):
         maxz = np.max(self.p[:,2])
         bbc = np.array([maxx-minx,maxy-miny,maxz-minz])
 
-        #logger.debug("U shape : %s" % str(U.shape))  # rotation matrix (nb_pts x nb_pts)
-        #logger.debug("S shape : %s" % str(S.shape))  # Diagonal matrix (3d vec)
-        #logger.debug(str(S))
-        #logger.debug("V shape : %s" % str(V.shape))  # rotation matrix (3x3)
-        #logger.debug(str(V))
-
-        #q = cq.Quaternion()
-        #q.from_mat(V)
-        #vec, ang = q.vecang()
-        #logger.debug("Vec : %s" % str(vec))
-        #logger.debug("Ang : %f" % ang)
         B0 = str(int(np.ceil(bbc[0])))
         B1 = str(int(np.ceil(bbc[1])))
         B2 = str(int(np.ceil(bbc[2])))
@@ -221,12 +208,7 @@ class PointCloud(object):
         self.name = name
         self.bbc = bbc
         self.V = V
-        # gravity center
-        # q : quaternion from V
-        #self.q = q
-        # vec :  rotation axis
-        #self.vec = vec
-        #self.ang = ang
+
     def show(self):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
