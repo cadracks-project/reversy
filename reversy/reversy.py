@@ -308,14 +308,14 @@ class Assembly(nx.DiGraph):
              solidk = self.get_solid_from_nodes([k])
              for j in range(k):
                 solidj = self.get_solid_from_nodes([j])
-                bint,dint = intersect(solidk,solidj)
+                bint,dint = intersect(solidk, solidj)
                 dist = dint[~bint]
-                if len(dist)==0:
-                    print(k,j,dist)
-                    self.add_edge(k,j,intersect=True,close=True)
+                if len(dist) == 0:
+                    print(k, j, dist)
+                    self.add_edge(k, j, intersect=True, close=True)
                 elif len(dist)==1:
                     if dist[0]<1:
-                        self.add_edge(k,j,close=True,intersect=False)
+                        self.add_edge(k, j, close=True, intersect=False)
 
     def clean(self):
         """
@@ -340,7 +340,7 @@ class Assembly(nx.DiGraph):
         """
         for (n,d) in self.nodes(data=True):
             V = d['V']
-            pc = d['pc']
+            ptc = d['pc']
             lV = str(list((d['V'].ravel())))
             lpc = str(list((d['pc'])))
 
@@ -348,7 +348,7 @@ class Assembly(nx.DiGraph):
             Vr = np.array(eval(lV)).reshape(3,3)
 
             assert(np.isclose(V - Vr,0).all())
-            assert(np.isclose(pc - pcr,0).all())
+            assert(np.isclose(ptc - pcr,0).all())
 
             d['V'] = lV
             d['pc'] = lpc
@@ -376,17 +376,39 @@ class Assembly(nx.DiGraph):
         self.serialized=False
 
     def save_json(self,filename=''):
+        """ save Assembly in json format
+
+        Parameters
+        ----------
+        filename : string
+
+        Notes
+        -----
+        If filename=='' filename is constructed from the origin file, i.e
+        the step file which is at teh beginning of the analysis
+
+        SEE ALSO
+        --------
+
+        networkx.readwrite.json_graph
+        json.dump
+
+        """
         if not self.isclean:
             self.clean()
             self.isclean = True
         self.serialize()
+
         data = json_graph.node_link_data(self)
+
+        # filename construction
         rep = os.path.dirname(self.origin)
         basename = os.path.basename(self.origin)
         rep = os.path.join(rep,os.path.splitext(basename)[0])
         if filename=='':
             filename = os.path.splitext(basename)[0]+'.json'
         filename = os.path.join(rep,filename)
+
         fd = open(filename,'w')
         with fd:
             json.dump(data,fd)
@@ -394,24 +416,41 @@ class Assembly(nx.DiGraph):
 
     def from_json(self,filename):
         """ load Assembly from json file
+
+        Parameters
+        ----------
+
+        filename : string
+
+
         """
+        # read Graph data
         fd = open(filename,'r')
         data = json.load(fd)
         fd.close()
+
         G = json_graph.node_link_graph(data,directed=True)
+
         self.isclean = True
         self.nodes = G.nodes
         self.edges = G.edges
         self.node = G.node
         self.edge = G.edge
         self.origin = filename
+
+        # transform string node data in numpy.array
         self.unserialize()
+
         # update nodes pos in graph
         for inode in self:
             self.pos[inode] = self.node[inode]['pc']
 
-    def merge_nodes(self,lnodes,filename='test.json'):
+    def merge_nodes(self,lnodes):
         """ merge a list of nodes into a sub Assembly
+
+        Parameters
+        ----------
+        lnodes : list of nodes
 
         """
 
@@ -443,11 +482,17 @@ class Assembly(nx.DiGraph):
         pcloud = pcloud.from_solid(solid)
         # get point cloud signature
         pcloud.signature()
-        filename = pcloud.sig + '.json'
-        A.save_json(filename)
+        # save assembly in step and json format
+        filejson = pcloud.sig + '.json'
+        filestep = pcloud.sig + '.stp'
+        A.save_json(filejson)
+        dirname = self.get_dirname()
+        solid.to_step(os.path.join(dirname,filestep))
         # add new assembly node
         new_node = max(self.node.keys()) + 1
-        self.add_node(new_node,name=filename)
+        V = np.eye(3)
+        ptc = np.array([0,0,0])
+        self.add_node(new_node, name=filejson, V=V, pc=ptc)
         self.nnodes = self.nnodes + 1
         self.pos[new_node] = pcloud.pc
 
@@ -534,6 +579,24 @@ class Assembly(nx.DiGraph):
                 self.df_nodes[self.df_nodes['name']==name] = dfname
             self.dnodes[k] = index
 
+    def get_dirname(self):
+        """ get dirname from self.origin
+
+        Notes
+        -----
+
+        If the origin file is a step file, there is a creation of
+        directory with the same name where all the derivated files
+        will be placed, including step files and json files.
+
+        """
+
+        ext = os.path.splitext(self.origin)[1]
+        if ((ext=='.stp') or (ext=='.step')):
+            dirname  = os.path.splitext(self.origin)[0]
+        else:
+            dirname  = os.path.dirname(self.origin)
+        return dirname
 
     def get_solid_from_nodes(self,lnodes):
         """ get a solid from nodes
@@ -541,32 +604,27 @@ class Assembly(nx.DiGraph):
         Parameters
         ----------
 
-        inode : int
+        lnodes : list of nodes or -1 for all
 
         Returns
         -------
 
         s : node solid
 
-        # TODO : A terme On devrait pouvoir retourner un COMPSOLID ou un COMPOUND
-
         Notes
         -----
 
-        If the assembly file has extension .stp it meas that the analysis has
+        If the assembly file has extension .stp it means that the analysis has
         not been done. After the analysis a directory has been created, it
         contains all the .stp file of the parts and a .json file which contains
         the graph information.
 
         """
-        ext = os.path.splitext(self.origin)[1]
-        if ((ext=='.stp') or (ext=='.step')):
-            rep  = os.path.splitext(self.origin)[0]
-        else:
-            rep  = os.path.dirname(self.origin)
-
-        lfiles = [str(self.node[k]['name'])+'.stp' for k in lnodes]
-        lV  = [ self.node[k]['V'] for k in lnodes ]
+        if lnodes == -1:
+            lnodes = self.node.keys()
+        rep = self.get_dirname()
+        lfiles = [ str(self.node[k]['name'])+'.stp' for k in lnodes ]
+        lV = [ self.node[k]['V'] for k in lnodes ]
         lpc = [ self.node[k]['pc'] for k in lnodes ]
         solid = cm.Solid([])
 
@@ -750,6 +808,9 @@ if __name__ == "__main__":
     #filename = "../step/MOTORIDUTTORE_ASM.stp" # OCC compound
     #filename = "../step/aube_pleine.stp"  # OCC Solid
     a1 = reverse(filename,view=False)
+    A = a1.merge_nodes([1,7,9,3,5])
+    B = a1.merge_nodes([0,6,8,2,4])
+    a1.save_json()
     #a1 = Assembly()
     #basename = os.path.basename(filename)
     #rep = os.path.join(os.path.dirname(filename),os.path.splitext(basename)[0])
