@@ -32,7 +32,7 @@ logger = logging.getLogger('__name__')
 class Assembly(nx.DiGraph):
     r""" Assembly Class
 
-    This class has to be connected to the osvcad AssemblyGeometry representation
+    This class has to be connected to the osvcad Assembly Geometry representation
 
     An Assembly is a Graph.
 
@@ -40,12 +40,19 @@ class Assembly(nx.DiGraph):
 
     Each node of an Assembly is described in an external file
 
+    An assembly has the following members
+
+    nnodes : int
+        number of nodes
+
     A node has the following attributes :
 
     'name' : name of the origin file (step file or python file)
-    'dim' : a dimension integer
     'pc' : a translation vector
     'V' : a unitary matrix
+    'volume' : volume of the solid associated to the node
+    'assembly' : boolean
+        Tuue if the node is an assembly
 
     Methods
     -------
@@ -62,6 +69,23 @@ class Assembly(nx.DiGraph):
         self.serialized = False
 
     def from_step(self, filename):
+        """ creates an non hierarchical assembly with a solid per node
+
+        Parameters
+        ----------
+        filename : str
+            step file name
+
+        Notes
+        -----
+
+        Creates a node per valid solid (check TRUE)
+        This assembly is not clean it contains a lot of information in each
+        node.
+        pcloud : pc.Pointcloud (centered and ordered point cloud)
+        shape : cm.Solid
+
+        """
         self.solid = cm.from_step(filename)
         self.isclean = False
         #
@@ -72,19 +96,17 @@ class Assembly(nx.DiGraph):
         #self.G = nx.DiGraph()
         self.origin = filename
         shells = self.solid.subshapes("Shell")
-        logger.info("%i shells in assembly" % len(shells))
+        #logger.info("%i shells in assembly" % len(shells))
         self.nnodes = 0
         for k, shell in enumerate(shells):
             solid = cm.Solid([shell])
             # check the shell coresponds to a cosed solid
             if solid.check():
-                logger.info("Dealing with shell nb %i" % k)
+                #logger.info("Dealing with shell nb %i" % k)
                 #pcloud = np.array([[]])
                 #pcloud.shape = (3, 0)
-                pcloud = pc.PointCloud()
-                pcloud = pcloud.from_solid(solid)
-
-
+                #pcloud = pc.PointCloud()
+                #pcloud = pcloud.from_solid(solid)
                 #vertices = shell.subshapes("Vertex")
                 #logger.info("%i vertices found for direct method")
                 #for vertex in vertices:
@@ -92,13 +114,15 @@ class Assembly(nx.DiGraph):
                     #pcloud = np.append(pcloud, point, axis=1)
                 #    pcloud = pcloud + point
                 # add shape to graph if shell not degenerated
-                Npoints = pcloud.p.shape[0]
+                #Npoints = pcloud.p.shape[0]
 
-                if ((shell.area()>0) and Npoints >=3):
-                    pcloud.centering()
-                    pcloud.ordering()
+                #if ((shell.area()>0) and Npoints >=3):
+                if shell.area()>0:
+                    #pcloud.centering()
+                    #pcloud.ordering()
                     # the stored point cloud is centered and ordered
-                    self.add_node(self.nnodes, pcloud=pcloud, shape=solid, volume=solid.volume())
+                    #self.add_node(self.nnodes, pcloud=pcloud, shape=solid, volume=solid.volume(), assembly=False)
+                    self.add_node(self.nnodes, shape=solid, volume=solid.volume(), assembly=False)
                     self.pos[self.nnodes] = solid.center()
                     self.nnodes += 1
 
@@ -144,10 +168,8 @@ class Assembly(nx.DiGraph):
         dxzl = { k : (self.pos[k][0]+(v*np.random.rand()-v/2),self.pos[k][2]+(v*np.random.rand()-v/2.)) for k in self.node.keys() }
         dyz = { k : (self.pos[k][2],self.pos[k][1]) for k in self.node.keys() }
         dyzl = { k : (self.pos[k][2]+(v*np.random.rand()-v/2),self.pos[k][1]+(v*np.random.rand()-v/2.)) for k in self.node.keys() }
-        #node_size = [ self.node[k]['dim'] for k in self.node.keys() ]
         node_size = [self.node[k]['volume']/1000. for k in self.node.keys()]
 
-        #dlab = {k : str(int(np.ceil(self.node[k]['dim']))) for k in self.node.keys() if self.edge[k].keys()==[] }
         dlab = {k : self.node[k]['sig'] for k in self.node.keys() }
 
         plt.figure(figsize=figsize)
@@ -253,7 +275,7 @@ class Assembly(nx.DiGraph):
             for k in self.node:
                 pcloudk = self.node[k]['pcloud']
 
-                lsamek = [ x for x in self.edge[k].keys() if self.edge[k][x]['equal']]
+                lsamek = [ x for x in self.edge[k].keys() if self.edge[k][x]['equal'] ]
 
                 if lsamek==[]:
                     self.lsig.append(pcloudk.sig)
@@ -263,9 +285,8 @@ class Assembly(nx.DiGraph):
                     refnode = [x for x in lsamek if self.edge[x].keys()==[]][0]
                     self.node[k]['name'] = self.node[refnode]['name']
                     pcsame = self.node[refnode]['pc']
-
+                    #
                     # self.node[k]['V']= self.node[refnode]['V']
-                    # self.node[k]['dim']= self.node[refnode]['dim']
                     #
                     # detection of eventual symmetry
                     #
@@ -283,7 +304,6 @@ class Assembly(nx.DiGraph):
 
                 self.node[k]['V'] = pcloudk.V
                 self.node[k]['pc'] = pcloudk.pc
-                #self.node[k]['dim'] = int(np.ceil(dim))
 
         # unique the list
         self.lsig = list(set(self.lsig))
@@ -457,8 +477,9 @@ class Assembly(nx.DiGraph):
         G = self.subgraph(lnodes)
         pos = { x : self.pos[x] for x in lnodes }
         # transcode node number
-        #lnodes_t = [ self.dnodes[x] for x in lnodes ]
-        #df_nodes = self.df_nodes.loc[lnodes_t]
+        lnodes_t = [ self.dnodes[x] for x in lnodes ]
+        df_nodes = self.df_nodes.loc[lnodes_t]
+
         A = Assembly()
         A.add_nodes_from(G.nodes())
         A.add_edges_from(G.edges())
@@ -467,6 +488,8 @@ class Assembly(nx.DiGraph):
         A.pos = pos
         A.origin = self.origin
         A.isclean = self.isclean
+        A.nnodes = len(lnodes)
+
         # create a solid from nodes
         solid = self.get_solid_from_nodes(lnodes)
         #A.save_json(filename)
@@ -492,7 +515,8 @@ class Assembly(nx.DiGraph):
         new_node = max(self.node.keys()) + 1
         V = np.eye(3)
         ptc = np.array([0,0,0])
-        self.add_node(new_node, name=filejson, V=V, pc=ptc)
+        self.add_node(new_node, name = pcloud.sig, V=V, pc=ptc, volume=
+                      solid.volume(), assembly = True, sig = pcloud.sig)
         self.nnodes = self.nnodes + 1
         self.pos[new_node] = pcloud.pc
 
@@ -514,65 +538,140 @@ class Assembly(nx.DiGraph):
         nx.write_gml(self,filename)
         self.unserialize()
 
+
     def write_components(self):
-        r"""Write individual components of the assembly
+        r""" Write individual components of the assembly
 
         Notes
         -----
 
-        Write components to their own step files in a
+        Write unique components to their own step files in a
         subdirectory of the folder containing the original file
 
         """
 
         if os.path.isfile(self.origin):
-            directory = os.path.dirname(self.origin)
-            basename = os.path.basename(self.origin)
-            subdirectory = os.path.join(directory,
-                                        os.path.splitext(basename)[0])
+            #directory = os.path.dirname(self.origin)
+            #basename = os.path.basename(self.origin)
+            #subdirectory = os.path.join(directory,
+            #                            os.path.splitext(basename)[0])
+            subdirectory = self.get_dirname()
             if not os.path.isdir(subdirectory):
                 os.mkdir(subdirectory)
         else:
             msg = "The components of the assembly should already exist"
             raise ValueError(msg)
 
+        # get the list of step files or json files in subdirectory
 
-        filelist = [ f for f in os.listdir(subdirectory) if f.endswith(".stp") ]
+        filelist = [ f for f in os.listdir(subdirectory) if (
+            f.endswith(".stp") or f.endswith(".json")) ]
 
         for f in filelist:
             os.remove(os.path.join(subdirectory,f))
 
-        self.df_nodes = pd.DataFrame(columns=('name','count','nodes','volume'))
+        # creates dataframe
+        self.df_nodes = pd.DataFrame(columns=('name','count','nodes','volume','assembly'))
         self.dnodes ={}
         for k in self.node:
             # calculate point cloud signature
-            self.node[k]['pcloud'].signature()
-            name = self.node[k]['pcloud'].name
-            pc = self.node[k]['pcloud'].pc
-            V = self.node[k]['pcloud'].V
-            Npoints = self.node[k]['pcloud'].Npoints
-            self.node[k]['pc'] = pc
-            self.node[k]['V'] = V
-            self.node[k]['Npoints'] =  Npoints
+            #pcloudk = self.node[k]['pcloud']
+            #
+            # solidk : uncentered solid
+            # solidk_centered : centered solid
+            #
+            solidk = self.node[k]['shape']
+            ptc = np.array(solidk.center())
+            # warning : center of gravity is from solid not pointcloud
+            solidk_centered = cm.translated(solidk,-ptc)
+            pcloudk = pc.PointCloud()
+            pcloudk = pcloudk.from_solid(solidk_centered)
+            Npoints = pcloudk.p.shape[0]
+            print("k : Npoints: ",k,Npoints)
+            pcloudk.ordering()
+            # point cloud is not necessarily centered
+            pcloudk.signature()
+            name = pcloudk.name
+            V = pcloudk.V
+            sig = pcloudk.sig
+            Npoints = pcloudk.Npoints
+
             self.node[k]['name'] = name
-            self.node[k]['sig'] = self.node[k]['pcloud'].sig
-            shp = self.node[k]['shape']
+            self.node[k]['pc'] = ptc
+            self.node[k]['flip'] = False
+            if np.linalg.det(V)>0:
+                self.node[k]['V'] = V
+            else:
+                V[:,2] = -V[:,2]
+                self.node[k]['V'] = V
+                self.node[k]['flip'] = True
+            # V is a assert as a rotation
+            assert(np.linalg.det(V)>0)
+            self.node[k]['sig'] = sig
+            self.node[k]['Npoints'] = Npoints
+
             filename = name + ".stp"
             filename = os.path.join(subdirectory, filename)
+            assembly = self.node[k]['assembly']
             # if the file is not existing yet then save it
             # as a translated and unitary transformed version
-            if not os.path.isfile(filename):
-                shp.translate(-pc)
-                shp.unitary(V.T)
-                #if shp.volume()<0:
-                #    shp.reverse()
-                shp.to_step(filename)
+            #
+            # Si le solide n'est pas déjà existant et stocké
+            #
+
+            #
+            # Transfer solidk to the origin
+            #
+            # The order of the geometrical operations is important
+            #
+            solidk.translate(-ptc)
+            if self.node[k]['flip']:
+                solidk.mirrorz()
+            solidk.unitary(V.T)
+            assert(np.allclose(solidk.center(),0))
+            #
+            # Point cloud of the solid centered and transformed
+            #
+            pcloudk_transformed = pc.PointCloud()
+            pcloudk_transformed = pcloudk_transformed.from_solid(solidk)
+            pcloudk_transformed.ordering()
+            lnames  = self.df_nodes['name'].values
+            #if not os.path.isfile(filename):
+            if not (name in lnames):
+                # save translated transformed unique shape to filename
+                solidk.to_step(filename)
                 index = len(self.df_nodes)
                 self.df_nodes = self.df_nodes.set_value(index,'name',name)
-                self.df_nodes = self.df_nodes.set_value(index,'volume',shp.volume())
+                self.df_nodes = self.df_nodes.set_value(index,'volume',solidk.volume())
                 self.df_nodes = self.df_nodes.set_value(index,'count',1)
                 self.df_nodes = self.df_nodes.set_value(index,'nodes',[k])
+                self.df_nodes = self.df_nodes.set_value(index,'assembly',assembly)
             else:
+                # get solid from origin file
+                solid_orig = cm.from_step(filename)
+                # transform it around origin
+                node_solid = self.df_nodes[self.df_nodes['name']==name]['nodes'].values[0][0]
+                #print("Node_solid",k,node_solid)
+                #solid.unitary(V_orig)
+                pcloud_orig = pc.PointCloud()
+                pcloud_orig = pcloud_orig.from_solid(solid_orig)
+                pcloud_orig.ordering()
+                d0,d1 = pcloud_orig.distance(pcloudk_transformed)
+                #S = np.dot(V.T,V_orig)
+                pdb.set_trace()
+                print(k, d0, d1)
+                #if k==7:
+                #    pdb.set_trace()
+                #self.node[k]['V'] = V_orig
+                #print(d0,d1)
+                #if pcloudk != pcloud_orig:
+                #    V1 = pcloud_orig.get_transform(pcloudk)
+                #    V2 = pcloudk.get_transform(pcloud_orig)
+                #    fig,ax = pcloudk.show(c = 'r')
+                #    fig,ax = pcloud_orig.show(fig=fig, ax=ax, c='b')
+                #    plt.show()
+                #    pdb.set_trace()
+
                 dfname = self.df_nodes[self.df_nodes['name']==name]
                 dfname['count'] = dfname['count'] + 1
                 dfname.iloc[0]['nodes'].append(k)
@@ -622,26 +721,31 @@ class Assembly(nx.DiGraph):
         """
         if lnodes == -1:
             lnodes = self.node.keys()
+
         rep = self.get_dirname()
+
         lfiles = [ str(self.node[k]['name'])+'.stp' for k in lnodes ]
         lV = [ self.node[k]['V'] for k in lnodes ]
+        lflip = [ self.node[k]['flip'] for k in lnodes ]
         lpc = [ self.node[k]['pc'] for k in lnodes ]
         solid = cm.Solid([])
 
         for k,s in enumerate(lfiles):
             filename = os.path.join(rep,s)
             shp = cm.from_step(filename)
+            #assert(np.allclose(np.array(shp.center()),0)),pdb.set_trace()
             V = lV[k]
             shp.unitary(V)
-            if shp.volume()<0:
-                shp.reverse()
+            if lflip[k]:
+                shp.mirrorz()
             shp.translate(lpc[k])
             solid = solid + shp
+            print(k,solid.shape.Orientation(),solid.volume(),shp.volume())
 
         return solid
 
     def view(self,node_index=-1):
-        """ view assembly (creates an html file)
+        """ view assembly
 
         Parameters
         ----------
@@ -659,13 +763,14 @@ class Assembly(nx.DiGraph):
         This function produces the view of the assembly in the global frame.
 
         """
+
         if type(node_index)==int:
             if node_index==-1:
                 node_index = self.node.keys()
             else:
                 node_index=[node_index]
 
-        assert(max(node_index)<=max(self.node.keys())),"Wrong node index"
+        assert( max(node_index) <= max(self.node.keys()) ),"Wrong node index"
 
         if self.serialized:
             s.unserialize()
@@ -705,12 +810,12 @@ def reverse(step_filename, view=False):
     # proximity precursor of contact
     # join axiality precursor of co-axiality (alignment)
     #
-    assembly.equalsim_nodes_edges()
-    assembly.delete_edges(kind='equal')
-    assembly.intersect_nodes_edges()
+    #assembly.equalsim_nodes_edges()
+    #assembly.delete_edges(kind='equal')
+    #assembly.intersect_nodes_edges()
     # assembly saving
     #assembly.save_gml()
-    assembly.save_json()
+    #assembly.save_json()
 
     if view:
         ccad_viewer = cd.view()
@@ -808,9 +913,9 @@ if __name__ == "__main__":
     #filename = "../step/MOTORIDUTTORE_ASM.stp" # OCC compound
     #filename = "../step/aube_pleine.stp"  # OCC Solid
     a1 = reverse(filename,view=False)
-    A = a1.merge_nodes([1,7,9,3,5])
-    B = a1.merge_nodes([0,6,8,2,4])
-    a1.save_json()
+    #A = a1.merge_nodes([1,7,9,3,5])
+    #B = a1.merge_nodes([0,6,8,2,4])
+    #a1.save_json()
     #a1 = Assembly()
     #basename = os.path.basename(filename)
     #rep = os.path.join(os.path.dirname(filename),os.path.splitext(basename)[0])

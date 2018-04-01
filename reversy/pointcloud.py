@@ -46,7 +46,7 @@ def getname(**kwargs):
     return(name)
 
 class PointCloud(object):
-    def __init__(self,p=np.array([[]]),ndim=3):
+    def __init__(self, p=np.array([[]]),ndim=3):
         """
         Parameters
         ----------
@@ -78,6 +78,13 @@ class PointCloud(object):
         P.Npoints = P.p.shape[0]
         return(P)
 
+
+    def __eq__(self,p):
+        assert(self.p.shape==p.p.shape)
+        norm = np.sqrt(np.sum(self.p*self.p))
+        d = np.sqrt(np.sum((self.p - p.p)*(self.p -p.p)))
+        return d < norm/1000.
+
     def __repr__(self):
         st = 'PointCloud : '+str(self.Npoints)+' points\n'
         if self.centered:
@@ -93,7 +100,27 @@ class PointCloud(object):
             st = st + 'V : ' + str(self.V) + '\n'
         return st
 
+    def distance(self,other):
+        assert(self.p.shape==other.p.shape)
+        #assert(self.centered and other.centered)
+        assert(self.ordered and other.ordered)
+
+        r0 = np.sqrt(np.sum((self.p)*(self.p)))
+        r1 = np.sqrt(np.sum((self.dist)*(self.dist)))
+        d0 = np.sqrt(np.sum((self.p - other.p)*(self.p -other.p)))
+        d1 = np.sqrt(np.sum((self.dist - other.dist)*(self.dist -other.dist)))
+
+        return d0/r0, d1/r1
+
     def from_solid(self,solid):
+        """ get points from solid
+
+        Parameters
+        ----------
+
+        solid : cm.Solid
+
+        """
         vertices = solid.subshapes("Vertex")
         for vertex in vertices:
             point = np.array(vertex.center())[:, None]
@@ -139,6 +166,10 @@ class PointCloud(object):
             return self.pc
 
     def centering(self):
+        """ apply a centering to the pointcloud
+
+        Boolean centered if set to True
+        """
         #
         # centering
         #
@@ -159,6 +190,18 @@ class PointCloud(object):
         self.ordered = True
         assert(self.p.shape[0]==self.Npoints), pdb.set_trace()
 
+    def get_transform(self,other):
+        """
+        Parameters
+        ----------
+        other : PointCloud
+
+        """
+        assert(self.p.shape == other.p.shape)
+        assert(self.centered and other.centered)
+        assert(self.ordered and other.ordered)
+        V = np.dot(self.p.T,other.p)
+        return(V)
 
     def signature(self):
         r""" Signature of a point cloud using SVD
@@ -186,19 +229,21 @@ class PointCloud(object):
         maxz = np.max(self.p[:,2])
         bbc = np.array([maxx-minx,maxy-miny,maxz-minz])
 
-        B0 = str(int(np.ceil(bbc[0])))
-        B1 = str(int(np.ceil(bbc[1])))
-        B2 = str(int(np.ceil(bbc[2])))
+        B0 = str(int(np.round(bbc[0])))
+        B1 = str(int(np.round(bbc[1])))
+        B2 = str(int(np.round(bbc[2])))
 
         S0 = str(int(np.ceil(S[0])))
         S1 = str(int(np.ceil(S[1])))
         if S[2]<1e-12:
             S2 = '0'
-            sig = S0 + '#' + S1+ "#" + S2 + '_' + B0 + "#" + B1 + '#' + B2
+            #sig = S0 + '#' + S1+ "#" + S2 + '_' + B0 + "#" + B1 + '#' + B2
+            sig = B0 + "#" + B1 + '#' + B2
             name = getname(dimension=sig,function='SYMAX')
         else:
             S2 = str(int(np.ceil(S[2])))
-            sig = S0 + '#' + S1+ "#" + S2 + '_' + B0 + "#" + B1 + '#' + B2
+            #sig = S0 + '#' + S1+ "#" + S2 + '_' + B0 + "#" + B1 + '#' + B2
+            sig = B0 + "#" + B1 + '#' + B2
             if S2=='1':
                 name = getname(dimension=sig,function='ALMSYM')
             else:
@@ -209,17 +254,16 @@ class PointCloud(object):
         self.bbc = bbc
         self.V = V
 
-    def show(self):
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        c = 'b'
-        m = 'o' # '^'
+    def show(self,fig=[],ax=[],c='b',m='o'):
+        if fig==[]:
+            fig = plt.figure()
+        if ax==[]:
+            ax = fig.add_subplot(111, projection='3d')
         ax.scatter(self.p[:,0], self.p[:,1], self.p[:,2], c=c, marker=m)
 
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
 
-        plt.show()
         return fig,ax
 
