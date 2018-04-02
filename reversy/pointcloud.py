@@ -103,7 +103,7 @@ class PointCloud(object):
     def distance(self,other):
         assert(self.p.shape==other.p.shape)
         #assert(self.centered and other.centered)
-        assert(self.ordered and other.ordered)
+        #"assert(self.ordered and other.ordered)
 
         r0 = np.sqrt(np.sum((self.p)*(self.p)))
         r1 = np.sqrt(np.sum((self.dist)*(self.dist)))
@@ -178,6 +178,30 @@ class PointCloud(object):
         assert(self.p.shape[0]==self.Npoints)
         self.centered = True
 
+    def sorting(self):
+        """ sort the point cloud
+        sort along x
+        then along y
+        then along z
+        """
+        ux = np.argsort(self.p[:,0])
+        self.p = self.p[ux,:]
+        unx = np.unique(self.p[:,0])
+        for x in unx:
+            u = (self.p[:,0]==x)
+            ptu = self.p[u,:]
+            uy = np.argsort(ptu[:,1])
+            ptus = ptu[uy,:]
+            uny = np.unique(ptus[:,1])
+            #pdb.set_trace()
+            for y in uny:
+                v = (ptus[:,1]==y)
+                ptv = ptus[v,:]
+                uz = np.argsort(ptv[:,2])
+                ptus[v] = ptv[uz,:]
+            self.p[u,:] = ptus
+        self.ordered = True
+
     def ordering(self):
         #
         # sorting points w.r.t distance to origin
@@ -186,8 +210,8 @@ class PointCloud(object):
         d = np.sqrt(np.sum(self.p*self.p,axis=1))
         self.u = np.argsort(d)
         self.dist = d[self.u]
-        self.p = self.p[self.u,:]
-        self.ordered = True
+        #self.p = self.p[self.u,:]
+        #self.ordered = True
         assert(self.p.shape[0]==self.Npoints), pdb.set_trace()
 
     def get_transform(self,other):
@@ -253,6 +277,8 @@ class PointCloud(object):
         self.name = name
         self.bbc = bbc
         self.V = V
+        self.S = S
+        self.U = U
 
     def show(self,fig=[],ax=[],c='b',m='o'):
         if fig==[]:

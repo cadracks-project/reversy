@@ -587,12 +587,23 @@ class Assembly(nx.DiGraph):
             pcloudk = pc.PointCloud()
             pcloudk = pcloudk.from_solid(solidk_centered)
             Npoints = pcloudk.p.shape[0]
-            print("k : Npoints: ",k,Npoints)
+            pcloudk.sorting()
             pcloudk.ordering()
+
             # point cloud is not necessarily centered
+
             pcloudk.signature()
             name = pcloudk.name
+
             V = pcloudk.V
+            #S = pcloudk.S
+            #U = pcloudk.U
+
+            #pcheck = np.dot(np.dot(U[:,0:3],np.diag(S)),V)
+            #Y1 = np.dot(pcloudk.p.T,U[:,0:3])
+            #Y2 = np.dot(Y1,np.diag(1/S))
+            #Y3 = np.dot(Y2,V)
+
             sig = pcloudk.sig
             Npoints = pcloudk.Npoints
 
@@ -613,12 +624,6 @@ class Assembly(nx.DiGraph):
             filename = name + ".stp"
             filename = os.path.join(subdirectory, filename)
             assembly = self.node[k]['assembly']
-            # if the file is not existing yet then save it
-            # as a translated and unitary transformed version
-            #
-            # Si le solide n'est pas déjà existant et stocké
-            #
-
             #
             # Transfer solidk to the origin
             #
@@ -634,7 +639,9 @@ class Assembly(nx.DiGraph):
             #
             pcloudk_transformed = pc.PointCloud()
             pcloudk_transformed = pcloudk_transformed.from_solid(solidk)
+            pcloudk_transformed.sorting()
             pcloudk_transformed.ordering()
+            Uk,Sk,Vk = np.linalg.svd(pcloudk_transformed.p)
             lnames  = self.df_nodes['name'].values
             #if not os.path.isfile(filename):
             if not (name in lnames):
@@ -655,11 +662,18 @@ class Assembly(nx.DiGraph):
                 #solid.unitary(V_orig)
                 pcloud_orig = pc.PointCloud()
                 pcloud_orig = pcloud_orig.from_solid(solid_orig)
+                pcloud_orig.sorting()
                 pcloud_orig.ordering()
-                d0,d1 = pcloud_orig.distance(pcloudk_transformed)
+                #d0,d1 = pcloud_orig.distance(pcloudk_transformed)
                 #S = np.dot(V.T,V_orig)
-                pdb.set_trace()
-                print(k, d0, d1)
+                #T1 = np.dot(pcloud_orig.p.T,pcloudk_transformed.p)
+                #T2 = np.dot(pcloudk_transformed.p.T,pcloud_orig.p)
+                # print(k, d0, d1)
+                #SI = np.diag(1./Sk)
+                #U3 = Uk[:,:3]
+                #H1 = np.dot(pcloud_orig.p.T,U3)
+                #H2 = np.dot(H1,SI)
+                #T3 = np.dot(H2,Vk)
                 #if k==7:
                 #    pdb.set_trace()
                 #self.node[k]['V'] = V_orig
@@ -740,7 +754,7 @@ class Assembly(nx.DiGraph):
                 shp.mirrorz()
             shp.translate(lpc[k])
             solid = solid + shp
-            print(k,solid.shape.Orientation(),solid.volume(),shp.volume())
+            #print(k,solid.shape.Orientation(),solid.volume(),shp.volume())
 
         return solid
 
