@@ -263,13 +263,13 @@ class PointCloud(object):
             S2 = '0'
             #sig = S0 + '#' + S1+ "#" + S2 + '_' + B0 + "#" + B1 + '#' + B2
             sig = B0 + "#" + B1 + '#' + B2
-            name = getname(dimension=sig,function='SYMAX')
+            name = getname(dimension=sig, function='SYMAX')
         else:
             S2 = str(int(np.ceil(S[2])))
             #sig = S0 + '#' + S1+ "#" + S2 + '_' + B0 + "#" + B1 + '#' + B2
             sig = B0 + "#" + B1 + '#' + B2
             if S2=='1':
-                name = getname(dimension=sig,function='ALMSYM')
+                name = getname(dimension=sig, function='ALMSYM')
             else:
                 name = getname(dimension=sig)
 

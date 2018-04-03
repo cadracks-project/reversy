@@ -237,15 +237,23 @@ class Assembly(nx.DiGraph):
         #       check if point cloud are close
         # dist is the distance fingerprint
         if not self.isclean:
-            self.df_edges = pd.DataFrame(columns=('tail','head','equal','sim','intersect','close'))
+            self.df_edges = pd.DataFrame(columns = ('tail', 'head', 'equal', 'sim', 'intersect', 'close'))
             self.lsig = []
             for k in self.node:
-                 pcloudk = self.node[k]['pcloud']
-                 mink = np.max(pcloudk.p, axis=0)
-                 maxk = np.max(pcloudk.p, axis=0)
-                 dk = pcloudk.dist
-                 for j in range(k):
-                    pcloudj = self.node[j]['pcloud']
+                solidk = self.node[k]['shape']
+                pcloudk = pc.PointCloud()
+                pcloudk = pcloudk.from_solid(solidk)
+                pcloudk.sorting()
+                pcloudk.ordering()
+                #mink = np.min(pcloudk.p, axis=0)
+                #maxk = np.max(pcloudk.p, axis=0)
+                dk = pcloudk.dist
+                for j in range(k):
+                    solidj = self.node[j]['shape']
+                    pcloudj = pc.PointCloud()
+                    pcloudj = pcloudk.from_solid(solidk)
+                    pcloudj.sorting()
+                    pcloudj.ordering()
 
                     #print(k,j,dint[~bint])
                     dj = pcloudj.dist
@@ -273,14 +281,19 @@ class Assembly(nx.DiGraph):
 
             self.lsig = []
             for k in self.node:
-                pcloudk = self.node[k]['pcloud']
+                solidk = self.node[k]['shape']
+                pcloudk = pc.PointCloud()
+                pcloudk = pcloudk.from_solid(solidk)
+                pcloudk.sorting()
+                pcloudk.ordering()
+                pcloudk.signature()
 
                 lsamek = [ x for x in self.edge[k].keys() if self.edge[k][x]['equal'] ]
 
-                if lsamek==[]:
+                if lsamek == []:
                     self.lsig.append(pcloudk.sig)
-                    self.node[k]['name'] = pcloudk.name
-                    self.node[k]['V'] = pcloudk.V
+                    #self.node[k]['name'] = pcloudk.name
+                    #self.node[k]['V'] = pcloudk.V
                 else:
                     refnode = [x for x in lsamek if self.edge[x].keys()==[]][0]
                     self.node[k]['name'] = self.node[refnode]['name']
@@ -293,8 +306,8 @@ class Assembly(nx.DiGraph):
                     # The symmetry is informed in the node
                     #
                     vec = np.abs(pcsame-pcloudk.pc)[None,:]
-                    dp = np.sum(vec,axis=0)
-                    nomirror = np.isclose(dp,0)
+                    dp = np.sum(vec, axis=0)
+                    nomirror = np.isclose(dp, 0)
                     if nomirror[0] == False:
                         self.add_node(k, mx=True)
                     if nomirror[1] == False:
@@ -302,8 +315,8 @@ class Assembly(nx.DiGraph):
                     if nomirror[2] == False:
                         self.add_node(k, mz=True)
 
-                self.node[k]['V'] = pcloudk.V
-                self.node[k]['pc'] = pcloudk.pc
+                #self.node[k]['V'] = pcloudk.V
+                #self.node[k]['pc'] = pcloudk.pc
 
         # unique the list
         self.lsig = list(set(self.lsig))
@@ -331,7 +344,7 @@ class Assembly(nx.DiGraph):
                 bint,dint = intersect(solidk, solidj)
                 dist = dint[~bint]
                 if len(dist) == 0:
-                    print(k, j, dist)
+                    #print(k, j, dist)
                     self.add_edge(k, j, intersect=True, close=True)
                 elif len(dist)==1:
                     if dist[0]<1:
@@ -342,7 +355,6 @@ class Assembly(nx.DiGraph):
         Clean temporary data before serializing the graph
         """
         for (n,d) in self.nodes(data=True):
-            del d['pcloud']
             del d['shape']
 
         # set a boolean for not cleaning twice
@@ -393,7 +405,7 @@ class Assembly(nx.DiGraph):
             Vr = np.array(eval(lV)).reshape(3,3)
             d['V'] = Vr
             d['pc'] = ptcr
-        self.serialized=False
+        self.serialized = False
 
     def save_json(self,filename=''):
         """ save Assembly in json format
@@ -593,23 +605,15 @@ class Assembly(nx.DiGraph):
             # point cloud is not necessarily centered
 
             pcloudk.signature()
-            name = pcloudk.name
 
             V = pcloudk.V
-            #S = pcloudk.S
-            #U = pcloudk.U
 
-            #pcheck = np.dot(np.dot(U[:,0:3],np.diag(S)),V)
-            #Y1 = np.dot(pcloudk.p.T,U[:,0:3])
-            #Y2 = np.dot(Y1,np.diag(1/S))
-            #Y3 = np.dot(Y2,V)
-
-            sig = pcloudk.sig
             Npoints = pcloudk.Npoints
 
-            self.node[k]['name'] = name
             self.node[k]['pc'] = ptc
             self.node[k]['flip'] = False
+            self.node[k]['Npoints'] = Npoints
+
             if np.linalg.det(V)>0:
                 self.node[k]['V'] = V
             else:
@@ -618,11 +622,7 @@ class Assembly(nx.DiGraph):
                 self.node[k]['flip'] = True
             # V is a assert as a rotation
             assert(np.linalg.det(V)>0)
-            self.node[k]['sig'] = sig
-            self.node[k]['Npoints'] = Npoints
 
-            filename = name + ".stp"
-            filename = os.path.join(subdirectory, filename)
             assembly = self.node[k]['assembly']
             #
             # Transfer solidk to the origin
@@ -633,7 +633,7 @@ class Assembly(nx.DiGraph):
             if self.node[k]['flip']:
                 solidk.mirrorz()
             solidk.unitary(V.T)
-            assert(np.allclose(solidk.center(),0))
+            #assert(np.allclose(solidk.center(),0))
             #
             # Point cloud of the solid centered and transformed
             #
@@ -641,7 +641,12 @@ class Assembly(nx.DiGraph):
             pcloudk_transformed = pcloudk_transformed.from_solid(solidk)
             pcloudk_transformed.sorting()
             pcloudk_transformed.ordering()
-            Uk,Sk,Vk = np.linalg.svd(pcloudk_transformed.p)
+            pcloudk_transformed.signature()
+            self.node[k]['sig'] = pcloudk_transformed.sig
+            name = pcloudk_transformed.name
+            self.node[k]['name'] = name
+            filename = pcloudk_transformed.name + ".stp"
+            filename = os.path.join(subdirectory, filename)
             lnames  = self.df_nodes['name'].values
             #if not os.path.isfile(filename):
             if not (name in lnames):
@@ -824,12 +829,12 @@ def reverse(step_filename, view=False):
     # proximity precursor of contact
     # join axiality precursor of co-axiality (alignment)
     #
-    #assembly.equalsim_nodes_edges()
-    #assembly.delete_edges(kind='equal')
-    #assembly.intersect_nodes_edges()
+    assembly.equalsim_nodes_edges()
+    assembly.delete_edges(kind='equal')
+    assembly.intersect_nodes_edges()
     # assembly saving
     #assembly.save_gml()
-    #assembly.save_json()
+    assembly.save_json()
 
     if view:
         ccad_viewer = cd.view()
