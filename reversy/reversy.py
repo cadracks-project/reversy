@@ -177,8 +177,20 @@ class Assembly(nx.DiGraph):
         plt.suptitle(self.origin,fontsize=fontsize+2)
         plt.subplot(2,2,1)
 
+        lequal = [ x for x in self.edges() if self.edge[x[0]][x[1]]['equal']]
+        lsim = [ x for x in self.edges() if self.edge[x[0]][x[1]]['sim']]
+        lintersect = [ x for x in self.edges() if self.edge[x[0]][x[1]]['intersect']]
+        lclose = [ x for x in self.edges() if self.edge[x[0]][x[1]]['close']]
+        #lequal = [ x for x in self.edges() if 'equal' in self.edge[x[0]][x[1]]]
+        #print(lequal)
+        #print(lsim)
+        #print(lintersect)
+        #print(lclose)
         nx.draw_networkx_nodes(self, dxy,node_size=node_size, alpha=alpha)
-        nx.draw_networkx_edges(self, dxy)
+        nx.draw_networkx_edges(self, dxy ,edgelist = lequal , edge_color='b')
+        nx.draw_networkx_edges(self, dxy ,edgelist = lsim, edge_color='c')
+        nx.draw_networkx_edges(self, dxy ,edgelist = lintersect, edge_color='r')
+        nx.draw_networkx_edges(self, dxy ,edgelist = lclose, edge_color='m')
 
         #edgelist_close = [ (x,y) for (x,y) in self.edges() if self.edge[x][y]['close']]
         #edgelist_intersect = [ (x,y) for (x,y) in self.edges() if self.edge[x][y]['intersect']]
@@ -192,7 +204,10 @@ class Assembly(nx.DiGraph):
         plt.subplot(2,2,2)
 
         nx.draw_networkx_nodes(self, dyz,node_size=node_size, alpha=alpha)
-        nx.draw_networkx_edges(self, dyz)
+        nx.draw_networkx_edges(self, dyz ,edgelist = lequal , edge_color='b')
+        nx.draw_networkx_edges(self, dyz ,edgelist = lsim, edge_color='c')
+        nx.draw_networkx_edges(self, dyz ,edgelist = lintersect, edge_color='r')
+        nx.draw_networkx_edges(self, dyz ,edgelist = lclose, edge_color='m')
         if blabels:
             nx.draw_networkx_labels(self, dyzl, labels=dlab, font_size=fontsize)
         plt.xlabel('Z axis (mm)',fontsize=fontsize)
@@ -201,7 +216,12 @@ class Assembly(nx.DiGraph):
 
         plt.subplot(2,2,3)
         nx.draw_networkx_nodes(self,dxz,node_size=node_size,alpha=alpha)
-        nx.draw_networkx_edges(self,dxz)
+
+        nx.draw_networkx_edges(self, dxz ,edgelist = lequal , edge_color='b')
+        nx.draw_networkx_edges(self, dxz ,edgelist = lsim, edge_color='c')
+        nx.draw_networkx_edges(self, dxz ,edgelist = lintersect, edge_color='r')
+        nx.draw_networkx_edges(self, dxz ,edgelist = lclose, edge_color='m')
+
         if blabels:
             nx.draw_networkx_labels(self,dxzl,labels=dlab,font_size=fontsize)
         plt.title("XZ plane",fontsize=fontsize)
@@ -271,14 +291,15 @@ class Assembly(nx.DiGraph):
                         if np.allclose(DEjk,0):
                         # The two point clouds are equal w.r.t sorted points to origin distances
                             if self.edge[j].keys()==[]:
-                                self.add_edge(k, j, equal=True, sim=True, djk=DEjk)
+                                self.add_edge(k, j,
+                                              equal=True,sim=True,intersect=False,close=False, djk=DEjk)
                         #
                         # Relation 2 : almost equal
                         #
                         elif (rho1<0.01) and (rho2<0.05):
                             if self.edge[j].keys()==[]:
                            # The two point clouds are closed w.r.t sorted point to origin distances
-                                self.add_edge(k,j,equal=False,sim=True)
+                                self.add_edge(k,j,equal=False,sim=True,intersect=False,close=False)
 
             self.lsig = []
             for k in self.node:
@@ -336,7 +357,7 @@ class Assembly(nx.DiGraph):
             if self.edge[ed[0]][ed[1]].has_key(kind):
                 self.remove_edge(ed[0],ed[1])
 
-    def intersect_nodes_edges(self):
+    def intersect_nodes_edges(self,tol=2):
 
         for k in self.node:
              solidk = self.get_solid_from_nodes([k])
@@ -346,10 +367,11 @@ class Assembly(nx.DiGraph):
                 dist = dint[~bint]
                 if len(dist) == 0:
                     #print(k, j, dist)
-                    self.add_edge(k, j, intersect=True, close=True)
+                    self.add_edge(k, j, intersect=True, close=True,equal=False,sim=False)
                 elif len(dist)==1:
-                    if dist[0]<1:
-                        self.add_edge(k, j, close=True, intersect=False)
+                    print(dist[0])
+                    if dist[0]<tol:
+                        self.add_edge(k, j, close=True, intersect=False,equal=False,sim=False)
 
     def clean(self):
         """
@@ -357,6 +379,7 @@ class Assembly(nx.DiGraph):
         """
         for (n,d) in self.nodes(data=True):
             del d['shape']
+            del d['pcloud']
 
         # set a boolean for not cleaning twice
         self.bclean = True
@@ -595,16 +618,14 @@ class Assembly(nx.DiGraph):
             #
             solidk = self.node[k]['shape']
             ptc = np.array(solidk.center())
-            # warning : center of gravity is from solid not pointcloud
+
+            # warning : center of gravity is obtained from solid not from pointcloud
             solidk_centered = cm.translated(solidk,-ptc)
             pcloudk = pc.PointCloud()
             pcloudk = pcloudk.from_solid(solidk_centered)
             Npoints = pcloudk.p.shape[0]
             pcloudk.sorting()
             pcloudk.ordering()
-
-            # point cloud is not necessarily centered
-
             pcloudk.signature()
 
             V = pcloudk.V
@@ -646,6 +667,8 @@ class Assembly(nx.DiGraph):
             self.node[k]['sig'] = pcloudk_transformed.sig
             name = pcloudk_transformed.name
             self.node[k]['name'] = name
+            self.node[k]['pcloud'] = pcloudk_transformed
+
             filename = pcloudk_transformed.name + ".stp"
             filename = os.path.join(subdirectory, filename)
             lnames  = self.df_nodes['name'].values
@@ -663,13 +686,13 @@ class Assembly(nx.DiGraph):
                 # get solid from origin file
                 solid_orig = cm.from_step(filename)
                 # transform it around origin
-                node_solid = self.df_nodes[self.df_nodes['name']==name]['nodes'].values[0][0]
+                #node_solid = self.df_nodes[self.df_nodes['name']==name]['nodes'].values[0][0]
                 #print("Node_solid",k,node_solid)
                 #solid.unitary(V_orig)
-                pcloud_orig = pc.PointCloud()
-                pcloud_orig = pcloud_orig.from_solid(solid_orig)
-                pcloud_orig.sorting()
-                pcloud_orig.ordering()
+                #pcloud_orig = pc.PointCloud()
+                #pcloud_orig = pcloud_orig.from_solid(solid_orig)
+                #pcloud_orig.sorting()
+                #pcloud_orig.ordering()
                 #d0,d1 = pcloud_orig.distance(pcloudk_transformed)
                 #S = np.dot(V.T,V_orig)
                 #T1 = np.dot(pcloud_orig.p.T,pcloudk_transformed.p)
@@ -839,11 +862,11 @@ def reverse(step_filename, view=False):
     print("delete_edges")
     #assembly.delete_edges(kind='equal')
     print("intersect_nodes_edges")
-    #assembly.intersect_nodes_edges()
+    assembly.intersect_nodes_edges()
     # assembly saving
     #assembly.save_gml()
     print('save json')
-    assembly.save_json()
+    #assembly.save_json()
 
     if view:
         ccad_viewer = cd.view()
@@ -856,8 +879,6 @@ def reverse(step_filename, view=False):
 
 def view(step_filename):
     r"""View the STEP file contents in the aocutils wx viewer.
-
-    The aocutils wx viewer is good to visualize topology.
 
     Parameters
     ----------
@@ -941,8 +962,8 @@ if __name__ == "__main__":
     #filename = "../step/MOTORIDUTTORE_ASM.stp" # OCC compound
     #filename = "../step/aube_pleine.stp"  # OCC Solid
     a1 = reverse(filename,view=False)
-    #A = a1.merge_nodes([1,7,9,3,5])
-    #B = a1.merge_nodes([0,6,8,2,4])
+    A = a1.merge_nodes([1,7,9,3,5])
+    B = a1.merge_nodes([0,6,8,2,4])
     #a1.save_json()
     #a1 = Assembly()
     #basename = os.path.basename(filename)
