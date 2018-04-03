@@ -8,6 +8,7 @@ Decomposing an assembly obtained from a STEP file
 from __future__ import print_function
 import wx
 import os
+import time
 import pdb
 import logging
 import json
@@ -251,7 +252,7 @@ class Assembly(nx.DiGraph):
                 for j in range(k):
                     solidj = self.node[j]['shape']
                     pcloudj = pc.PointCloud()
-                    pcloudj = pcloudk.from_solid(solidk)
+                    pcloudj = pcloudj.from_solid(solidj)
                     pcloudj.sorting()
                     pcloudj.ordering()
 
@@ -821,7 +822,11 @@ def reverse(step_filename, view=False):
     assembly = Assembly()
     assembly.from_step(step_filename)
     # write a separate step file for each node
+    print("write_components")
+    tic = time.time()
     assembly.write_components()
+    toc = time.time()
+    print(toc-tic)
     # tag and analyze nodes - creates edges between nodes based
     # on dicovered pointcloud similarity and proximity
     #
@@ -829,11 +834,15 @@ def reverse(step_filename, view=False):
     # proximity precursor of contact
     # join axiality precursor of co-axiality (alignment)
     #
+    print("equal_sim_nodes_edges")
     assembly.equalsim_nodes_edges()
-    assembly.delete_edges(kind='equal')
-    assembly.intersect_nodes_edges()
+    print("delete_edges")
+    #assembly.delete_edges(kind='equal')
+    print("intersect_nodes_edges")
+    #assembly.intersect_nodes_edges()
     # assembly saving
     #assembly.save_gml()
+    print('save json')
     assembly.save_json()
 
     if view:
