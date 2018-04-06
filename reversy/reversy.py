@@ -17,9 +17,9 @@ from os import path as _path
 from osvcad.nodes import AssemblyGeometryNode
 import ccad.model as cm
 import ccad.display as cd
-from OCC.Display.WebGl import threejs_renderer
-from aocxchange.step import StepImporter
-from aocutils.display.wx_viewer import Wx3dViewer
+from OCC.Display.WebGl import threejs_renderer,jupyter_renderer
+#from aocxchange.step import StepImporter
+#from aocutils.display.wx_viewer import Wx3dViewer
 import matplotlib.pyplot as plt
 import numpy as np
 import networkx as nx
@@ -228,6 +228,7 @@ class Assembly(nx.DiGraph):
         plt.xlabel('X axis (mm)',fontsize=fontsize)
         plt.ylabel('Z axis (mm)',fontsize=fontsize)
         plt.subplot(2,2,4)
+        plt.tight_layout()
         if blabels:
             nx.draw(self,labels=dlab,alpha=alpha,font_size=fontsize,node_size=node_size)
         else:
@@ -236,6 +237,7 @@ class Assembly(nx.DiGraph):
             plt.savefig(self.origin+'png')
         if bshow:
             plt.show()
+
 
     def equalsim_nodes_edges(self):
         r""" connect equal and sim nodes
@@ -369,7 +371,7 @@ class Assembly(nx.DiGraph):
                     #print(k, j, dist)
                     self.add_edge(k, j, intersect=True, close=True,equal=False,sim=False)
                 elif len(dist)==1:
-                    print(dist[0])
+                    #print(dist[0])
                     if dist[0]<tol:
                         self.add_edge(k, j, close=True, intersect=False,equal=False,sim=False)
 
@@ -506,7 +508,14 @@ class Assembly(nx.DiGraph):
 
         Parameters
         ----------
+
         lnodes : list of nodes
+
+        Returns
+        -------
+
+        A : Assembly
+            a sub assembly
 
         """
 
@@ -554,11 +563,11 @@ class Assembly(nx.DiGraph):
         self.add_node(new_node, name = pcloud.sig, V=V, pc=ptc, volume=
                       solid.volume(), assembly = True, sig = pcloud.sig)
         self.nnodes = self.nnodes + 1
-        self.pos[new_node] = pcloud.pc
+        self.pos[new_node] = solid.center()
 
         # connect assembly nodes to valid nodes
         for n in lvalid:
-            self.add_edge(new_node,n)
+            self.add_edge(new_node,n,close=False,intersect=False,sim=False,equal=False)
         # delete nodes from lnodes
         self.remove_nodes(lnodes)
         #
@@ -787,7 +796,7 @@ class Assembly(nx.DiGraph):
 
         return solid
 
-    def view(self,node_index=-1):
+    def view(self,node_index=-1,jupyter=False):
         """ view assembly
 
         Parameters
@@ -821,11 +830,16 @@ class Assembly(nx.DiGraph):
         solid = self.get_solid_from_nodes(node_index)
 
         #solid.to_html('assembly.html')
-        my_renderer = threejs_renderer.ThreejsRenderer()
-        my_renderer.DisplayShape(solid.shape)
-        my_renderer.render()
+        if jupyter:
+            j = jupyter_renderer.JupyterRenderer()
+            j.DisplayShape(solid.shape,update=True)
+            return solid,j
+        else:
+            my_renderer = threejs_renderer.ThreejsRenderer()
+            my_renderer.DisplayShape(solid.shape)
+            my_renderer.render()
 
-        return solid
+            return solid
 
 
 def reverse(step_filename, view=False):
@@ -845,11 +859,11 @@ def reverse(step_filename, view=False):
     assembly = Assembly()
     assembly.from_step(step_filename)
     # write a separate step file for each node
-    print("write_components")
-    tic = time.time()
+    #print("write_components")
+    #tic = time.time()
     assembly.write_components()
-    toc = time.time()
-    print(toc-tic)
+    #toc = time.time()
+    #print(toc-tic)
     # tag and analyze nodes - creates edges between nodes based
     # on dicovered pointcloud similarity and proximity
     #
@@ -877,32 +891,32 @@ def reverse(step_filename, view=False):
     return(assembly)
 
 
-def view(step_filename):
-    r"""View the STEP file contents in the aocutils wx viewer.
-
-    Parameters
-    ----------
-
-    step_filename : str
-        path to the STEP file
-
-    """
-
-    importer = StepImporter(filename=step_filename)
-
-    class MyFrame(wx.Frame):
-        r"""Frame for testing"""
-        def __init__(self):
-            wx.Frame.__init__(self, None, -1)
-            self.p = Wx3dViewer(self)
-            for shape in importer.shapes:
-                self.p.display_shape(shape)
-            self.Show()
-
-    app = wx.App()
-    frame = MyFrame()
-    app.SetTopWindow(frame)
-    app.MainLoop()
+#def view(step_filename):
+#    r"""View the STEP file contents in the aocutils wx viewer.
+#
+#    Parameters
+#    ----------
+#
+#    step_filename : str
+#        path to the STEP file
+#
+#    """
+#
+#    importer = StepImporter(filename=step_filename)
+#
+#    class MyFrame(wx.Frame):
+#        r"""Frame for testing"""
+#        def __init__(self):
+#            wx.Frame.__init__(self, None, -1)
+#            self.p = Wx3dViewer(self)
+#            for shape in importer.shapes:
+#                self.p.display_shape(shape)
+#            self.Show()
+#
+#    app = wx.App()
+#    frame = MyFrame()
+#    app.SetTopWindow(frame)
+#    app.MainLoop()
 
 def intersect(s1,s2):
     """ Determine intersection of 2 shapes bounding boxes
