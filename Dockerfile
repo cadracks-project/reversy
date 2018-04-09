@@ -2,6 +2,20 @@ FROM guillaumeflorent/miniconda-pythonocc:3-0.18.3
 
 MAINTAINER Guillaume Florent <florentsailing@gmail.com>
 
+#############
+# pythreejs #
+#############
+
+WORKDIR /opt
+RUN git clone https://github.com/jovyan/pythreejs
+WORKDIR /opt/pythreejs
+RUN /opt/conda/bin/pip install .
+WORKDIR /opt/pythreejs/js
+RUN npm run autogen
+RUN npm run build:all
+RUN jupyter nbextension install --py --symlink --sys-prefix pythreejs
+RUN jupyter nbextension enable pythreejs --py --sys-prefix
+
 # For wx : libgtk2.0-0 libxxf86vm1
 # Funily, installing libgtk2.0-0 seems to solve the XCB plugin not found issue for Qt !!
 # For pyqt : libgl1-mesa-dev libx11-xcb1
