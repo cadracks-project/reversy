@@ -6,13 +6,7 @@ MAINTAINER Guillaume Florent <florentsailing@gmail.com>
 # pythreejs #
 #############
 
-RUN apt-get update
-RUN apt-get install -y software-properties-common
-RUN add-apt-repository ppa:ubuntu-toolchain-r/test
-RUN apt-get update
-RUN apt-get install -y wget git build-essential libgl1-mesa-dev libfreetype6-dev libglu1-mesa-dev libzmq3-dev libsqlite3-dev libboost-all-dev libicu-dev python3-dev libgl2ps-dev libfreeimage-dev libtbb-dev g++-7 libopenblas-dev
-
-RUN conda install -y -c conda-forge cmake=3.10.0 swig==3.0.12 ninja=1.8.2
+RUN apt-get update && apt-get install -y nodejs && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt
 RUN git clone https://github.com/jovyan/pythreejs
