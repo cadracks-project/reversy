@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 from interval import interval
 
-import reversy.pointcloud as pc
+import pointcloud as pc
 
 logger = logging.getLogger(__name__)
 

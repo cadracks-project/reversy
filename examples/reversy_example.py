@@ -6,6 +6,7 @@ r"""reversy example use"""
 import logging
 
 from reversy.reversy import reverse
+import reversy.pointcloud as pc
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s :: %(levelname)6s :: '
