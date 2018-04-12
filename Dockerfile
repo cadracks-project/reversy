@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y libgtk2.0-0 libxxf86vm1 libgl1-mesa-dev
 
 # Other conda packages
 RUN conda install -y numpy matplotlib networkx pandas wxpython pyqt pytest
-RUN conda install -y -c tpaviot pythreejs
+RUN conda install -c conda-forge pythreejs
 
 # ccad
 WORKDIR /opt
