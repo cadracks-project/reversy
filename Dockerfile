@@ -9,16 +9,13 @@ RUN apt-get update && apt-get install -y libgtk2.0-0 libxxf86vm1 libgl1-mesa-dev
 
 # Other conda packages
 RUN conda install -y numpy matplotlib networkx pandas wxpython pyqt pytest
-RUN conda install -c conda-forge pythreejs
-RUN conda install -c pythonocc smesh
-RUN conda install -c guyer gmsh
+RUN conda install -c gflorent ccad
 
-# ccad
-WORKDIR /opt
-# ADD https://api.github.com/repos/osv-team/ccad/git/refs/heads/master version.json
-RUN git clone --depth=1 https://github.com/osv-team/ccad
-WORKDIR /opt/ccad
-RUN python setup.py install
+# Pip
+RUN pip install pythreejs
+RUN jupyter nbextension install --py --symlink --sys-prefix pythreejs
+RUN jupyter nbextension enable --py --sys-prefix pythreejs
+RUN pip install interval
 
 # reversy
 WORKDIR /opt

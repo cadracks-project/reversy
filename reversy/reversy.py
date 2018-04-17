@@ -24,9 +24,12 @@ from OCC.Display.WebGl import threejs_renderer, jupyter_renderer
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from interval import interval
+try:
+    from interval import interval
+except ImportError:
+    from interval import Interval as interval
 
-import pointcloud as pc
+from . import pointcloud as pc
 
 logger = logging.getLogger(__name__)
 
