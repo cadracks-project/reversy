@@ -8,7 +8,7 @@ from OCC.Core import STEPControl
 from OCC.Display.WebGl import x3dom_renderer_osv
 # import pdb
 import sys
-" import random
+# import random
 #
 # usage stp2html.py filename level
 #

@@ -302,7 +302,7 @@ class PointCloud(object):
     # def show(self, fig=[], ax=[], c='b', m='o'):
     def show(self, fig=None, ax=None, c='b', m='o'):
         r"""Show 3D
-        
+
         Parameters
         ----------
         fig : Matplotlib Figure
