@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # coding: utf-8
 
 """Decomposing an assembly obtained from a STEP file
@@ -103,7 +102,7 @@ class Assembly(nx.DiGraph):
         shells = self.solid.subshapes("Shell")
         # logger.info("%i shells in assembly" % len(shells))
         self.nnodes = 0
-        for k, shell in enumerate(shells):
+        for _, shell in enumerate(shells):
             solid = cm.Solid([shell])
             # check the shell corresponds to a cosed solid
             if solid.check():
@@ -146,9 +145,19 @@ class Assembly(nx.DiGraph):
         return st
 
     def remove_nodes(self, lnodes):
-        assert(x in self.node for x in lnodes)
+        r"""
+
+        Parameters
+        ----------
+        lnodes
+
+        """
+        if not (x in self.node for x in lnodes):
+            raise AssertionError("")
         self.remove_nodes_from(lnodes)
-        [self.pos.pop(x) for x in lnodes ]
+        # [self.pos.pop(x) for x in lnodes ]
+        for x in lnode:
+            self.pos.pop(x)
         self.nnodes = len(self.node)
 
     def show_graph(self, **kwargs):
@@ -428,7 +437,7 @@ class Assembly(nx.DiGraph):
         """
         Clean temporary data before serializing the graph
         """
-        for (n, d) in self.nodes(data=True):
+        for (_, d) in self.nodes(data=True):
             del d['shape']
             del d['pcloud']
 
@@ -454,8 +463,11 @@ class Assembly(nx.DiGraph):
             pcr = np.array(eval(lpc))
             Vr = np.array(eval(lV)).reshape(3, 3)
 
-            assert(np.isclose(V - Vr, 0).all())
-            assert(np.isclose(ptc - pcr, 0).all())
+            if not np.isclose(V - Vr, 0).all():
+                raise AssertionError("")
+
+            if not np.isclose(ptc - pcr, 0).all():
+                raise AssertionError("")
 
             d['V'] = lV
             d['pc'] = lpc
@@ -705,7 +717,8 @@ class Assembly(nx.DiGraph):
                 self.node[k]['V'] = V
                 self.node[k]['flip'] = True
             # V is a assert as a rotation
-            assert(np.linalg.det(V) > 0)
+            if np.linalg.det(V) <= 0:
+                raise AssertionError("")
 
             assembly = self.node[k]['assembly']
             #
@@ -750,7 +763,11 @@ class Assembly(nx.DiGraph):
                                                         assembly)
             else:
                 # get solid from origin file
-                solid_orig = cm.from_step(filename)
+                # solid_orig = cm.from_step(filename)
+                # TODO : why not used?
+                _ = cm.from_step(filename)
+
+
                 # transform it around origin
                 # node_solid = self.df_nodes[self.df_nodes['name']==name]['nodes'].values[0][0]
                 # print("Node_solid",k,node_solid)
@@ -869,13 +886,16 @@ class Assembly(nx.DiGraph):
         This function produces the view of the assembly in the global frame.
 
         """
-        if type(node_index) == int:
+        # if type(node_index) == int:
+        if isinstance(node_index, int):
             if node_index == -1:
                 node_index = self.node.keys()
             else:
                 node_index=[node_index]
 
-        assert(max(node_index) <= max(self.node.keys())), "Wrong node index"
+        # assert(max(node_index) <= max(self.node.keys())), "Wrong node index"
+        if max(node_index) > max(self.node.keys()):
+            raise AssertionError("Wrong node index")
 
         if self.serialized:
             s.unserialize()

@@ -71,7 +71,9 @@ class PointCloud(object):
         self.ndim = ndim
         if p.size == 0:
             p.shape = (0, ndim)
-        assert(p.shape[1] == ndim)
+        # assert(p.shape[1] == ndim)
+        if p.shape[1] != ndim:
+            raise AssertionError("")
         self.Npoints = p.shape[0]
         self.p = p
         self.centered = False
@@ -87,7 +89,9 @@ class PointCloud(object):
         return P
 
     def __eq__(self, p):
-        assert(self.p.shape == p.p.shape)
+        # assert(self.p.shape == p.p.shape)
+        if self.p.shape != p.p.shape:
+            raise AssertionError("")
         norm = np.sqrt(np.sum(self.p*self.p))
         d = np.sqrt(np.sum((self.p - p.p)*(self.p - p.p)))
         return d < norm/1000.
@@ -109,7 +113,8 @@ class PointCloud(object):
 
     def distance(self, other):
         r"""Distance between 2 point clouds"""
-        assert(self.p.shape == other.p.shape)
+        if  self.p.shape != other.p.shape:
+            raise AssertionError("")
         # assert(self.centered and other.centered)
         # "assert(self.ordered and other.ordered)
 
@@ -159,6 +164,7 @@ class PointCloud(object):
         maxo_y = np.max(other.p[:, 1])
         maxo_z = np.max(other.p[:, 2])
 
+        # TODO : the following 6 variables are not used. What is the intention?
         dx1 = mino_x - max_x
         dx2 = min_x - maxo_x
 
@@ -184,7 +190,8 @@ class PointCloud(object):
         #
         self.pc = np.mean(self.p, axis=0)
         self.p = self.p - self.pc
-        assert(self.p.shape[0] == self.Npoints)
+        if self.p.shape[0] != self.Npoints:
+            raise AssertionError("")
         self.centered = True
 
     def sorting(self):
@@ -230,9 +237,12 @@ class PointCloud(object):
         other : PointCloud
 
         """
-        assert(self.p.shape == other.p.shape)
-        assert(self.centered and other.centered)
-        assert(self.ordered and other.ordered)
+        if self.p.shape != other.p.shape:
+            raise AssertionError("")
+        if not (self.centered and other.centered):
+            raise AssertionError("")
+        if not (self.ordered and other.ordered):
+            raise AssertionError("")
         V = np.dot(self.p.T, other.p)
         return V
 
@@ -289,10 +299,23 @@ class PointCloud(object):
         self.S = S
         self.U = U
 
-    def show(self, fig=[], ax=[], c='b', m='o'):
-        if fig == []:
+    # def show(self, fig=[], ax=[], c='b', m='o'):
+    def show(self, fig=None, ax=None, c='b', m='o'):
+        r"""Show 3D
+        
+        Parameters
+        ----------
+        fig : Matplotlib Figure
+        ax : Matplotlib axes
+        c
+        m
+
+        """
+        # if fig == []:
+        if fig is None:
             fig = plt.figure()
-        if ax == []:
+        # if ax == []:
+        if ax is None:
             ax = fig.add_subplot(111, projection='3d')
         ax.scatter(self.p[:, 0], self.p[:, 1], self.p[:, 2], c=c, marker=m)
 
