@@ -46,5 +46,7 @@ setup(
         'test': ['pytest', 'coverage'],
     },
     package_data={},
-    data_files=[],
+    data_files=[('step/',
+                 ['step/ASM0001_ASM_1_ASM.stp',
+                  'step/aube_pleine.stp'])],
     entry_points={})
