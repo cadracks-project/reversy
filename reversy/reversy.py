@@ -29,12 +29,12 @@ from interval import interval
 #except ImportError:
 #    from interval import Interval as interval
 
-from . import pointcloud as pc
+import pointcloud as pc
 
 logger = logging.getLogger(__name__)
 
 
-class Assembly(nx.DiGraph):
+class Assembly(object):
     r""" Assembly Class
 
     This class has to be connected to the osvcad Assembly Geometry representation
@@ -71,6 +71,10 @@ class Assembly(nx.DiGraph):
     def __init__(self):
         super(Assembly, self).__init__()
 
+        # A dataframe for the nodes
+        self.dfnodes = pd.DataFrame()
+        # A dataframe for the edges
+        self.dfedges = pd.DataFrame()
         self.pos = dict()
         self.serialized = False
 
@@ -96,7 +100,7 @@ class Assembly(nx.DiGraph):
         self.isclean = False
         #
         # if it contains, An Assembly:
-        # is clean : filename and transformation
+        # is clean : only filename and transformation
         # is not clean : pointcloud and shape
         #
         # self.G = nx.DiGraph()
@@ -132,11 +136,13 @@ class Assembly(nx.DiGraph):
                     #               shape=solid,
                     #               volume=solid.volume(),
                     #               assembly=False)
-                    self.add_node(self.nnodes,
-                                  shape=solid,
-                                  volume=solid.volume(),
-                                  assembly=False)
-                    self.pos[self.nnodes] = solid.center()
+                    self.dfnnodes.ix[self.nnodes]={'shape':solid,'volume':solid.volume,'assembly':False,'pos':solid.center()}
+                    pdb.set_trace()
+                    #self.add_node(self.nnodes,
+                    #              shape=solid,
+                    #            volume=solid.volume(),
+                                  #assembly=False)
+                    #self.pos[self.nnodes] = solid.center()
                     self.nnodes += 1
 
     def __repr__(self):
