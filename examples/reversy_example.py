@@ -18,8 +18,9 @@ filename = "../step/ASM0001_ASM_1_ASM.stp"  # OCC compound
 # filename = "../step/MOTORIDUTTORE_ASM.stp" # OCC compound
 # filename = "../step/aube_pleine.stp"  # OCC Solid
 a1 = reverse(filename, view=False)
-A = a1.merge_nodes([1, 7, 9, 3, 5])
-B = a1.merge_nodes([0, 6, 8, 2, 4])
+#
+#A = a1.merge_nodes([1, 7, 9, 3, 5])
+# B = a1.merge_nodes([0, 6, 8, 2, 4])
 # a1.save_json()
 # a1 = Assembly()
 # basename = os.path.basename(filename)

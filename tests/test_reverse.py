@@ -7,7 +7,6 @@ from os.path import join, dirname
 
 from reversy.reversy import reverse
 
-
 def test_reverse():
     step_file = "../step/ASM0001_ASM_1_ASM.stp"  # OCC compound
     step_path = join(dirname(__file__), step_file)

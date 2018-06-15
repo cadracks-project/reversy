@@ -1,5 +1,4 @@
 # coding: utf-8
-
 """Decomposing an assembly obtained from a STEP file
 """
 
@@ -10,6 +9,7 @@ import os
 # import pdb
 import logging
 import json
+import pdb
 import networkx as nx
 from networkx.readwrite import json_graph
 # from os import path as _path
@@ -23,10 +23,11 @@ from OCC.Display.WebGl import threejs_renderer, jupyter_renderer
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-try:
-    from interval import interval
-except ImportError:
-    from interval import Interval as interval
+
+#%try:
+from interval import interval
+#except ImportError:
+#    from interval import Interval as interval
 
 from . import pointcloud as pc
 
@@ -56,7 +57,7 @@ class Assembly(nx.DiGraph):
     'V' : a unitary matrix
     'volume' : volume of the solid associated to the node
     'assembly' : boolean
-        Tuue if the node is an assembly
+        True if the node is an assembly
 
     Methods
     -------
@@ -69,6 +70,7 @@ class Assembly(nx.DiGraph):
     """
     def __init__(self):
         super(Assembly, self).__init__()
+
         self.pos = dict()
         self.serialized = False
 
@@ -88,8 +90,8 @@ class Assembly(nx.DiGraph):
         node.
         pcloud : pc.Pointcloud (centered and ordered point cloud)
         shape : cm.Solid
-
         """
+
         self.solid = cm.from_step(filename)
         self.isclean = False
         #
@@ -145,11 +147,11 @@ class Assembly(nx.DiGraph):
         return st
 
     def remove_nodes(self, lnodes):
-        r"""
+        r"""  remove nodes
 
         Parameters
         ----------
-        lnodes
+        lnodes : list of nodes
 
         """
         if not (x in self.node for x in lnodes):
@@ -201,10 +203,10 @@ class Assembly(nx.DiGraph):
         plt.suptitle(self.origin, fontsize=fontsize+2)
         plt.subplot(2, 2, 1)
 
-        lequal = [x for x in self.edges() if self.edge[x[0]][x[1]]['equal']]
-        lsim = [x for x in self.edges() if self.edge[x[0]][x[1]]['sim']]
-        lintersect = [x for x in self.edges() if self.edge[x[0]][x[1]]['intersect']]
-        lclose = [x for x in self.edges() if self.edge[x[0]][x[1]]['close']]
+        lequal = [x for x in list(self.edges()) if self[x[0]][x[1]]['equal']]
+        lsim = [x for x in list(self.edges) if self[x[0]][x[1]]['sim']]
+        lintersect = [x for x in list(self.edges()) if self[x[0]][x[1]]['intersect']]
+        lclose = [x for x in list(self.edges()) if self[x[0]][x[1]]['close']]
         # lequal = [ x for x in self.edges()
         #                                   if 'equal' in self.edge[x[0]][x[1]]]
         # print(lequal)
@@ -326,7 +328,7 @@ class Assembly(nx.DiGraph):
                         if np.allclose(DEjk, 0):
                             # The two point clouds are equal w.r.t sorted
                             # points to origin distances
-                            if self.edge[j].keys() == []:
+                            if self[j].keys() == []:
                                 self.add_edge(k, j,
                                               equal=True,
                                               sim=True,
@@ -337,7 +339,7 @@ class Assembly(nx.DiGraph):
                         # Relation 2 : almost equal
                         #
                         elif (rho1 < 0.01) and (rho2 < 0.05):
-                            if self.edge[j].keys() == []:
+                            if nx.DiGraph(self)[j].keys() == []:
                                 # The two point clouds are closed w.r.t sorted
                                 # point to origin distances
                                 self.add_edge(k, j,
@@ -355,14 +357,14 @@ class Assembly(nx.DiGraph):
                 pcloudk.ordering()
                 pcloudk.signature()
 
-                lsamek = [x for x in self.edge[k].keys() if self.edge[k][x]['equal']]
+                lsamek = [x for x in nx.DiGraph(self)[k].keys() if nx.DiGraph(self)[k][x]['equal']]
 
                 if lsamek == []:
                     self.lsig.append(pcloudk.sig)
                     # self.node[k]['name'] = pcloudk.name
                     # self.node[k]['V'] = pcloudk.V
                 else:
-                    refnode = [x for x in lsamek if self.edge[x].keys()==[]][0]
+                    refnode = [x for x in lsamek if self[x].keys()==[]][0]
                     self.node[k]['name'] = self.node[refnode]['name']
                     pcsame = self.node[refnode]['pc']
                     #
@@ -398,9 +400,9 @@ class Assembly(nx.DiGraph):
 
         """
 
-        for ed in self.edges():
+        for ed in list(self.edges()):
             # if self.edge[ed[0]][ed[1]].has_key(kind):
-            if kind in self.edge[ed[0]][ed[1]]:
+            if kind in self[ed[0]][ed[1]]:
                 self.remove_edge(ed[0], ed[1])
 
     def intersect_nodes_edges(self, tol=2):
@@ -409,6 +411,11 @@ class Assembly(nx.DiGraph):
         Parameters
         ----------
         tol
+
+        Notes
+        -----
+
+        For each couple of nodes check intersection
 
         """
         for k in self.node:
@@ -916,10 +923,11 @@ class Assembly(nx.DiGraph):
 
 
 def reverse(step_filename, view=False):
-    r"""Reverse STEP file using ccad
+    r"""Reverse STEP file
 
     Parameters
     ----------
+
     step_filename : str
         Path to the STEP file
     view : bool, optional (default is False)
@@ -938,9 +946,9 @@ def reverse(step_filename, view=False):
     # tag and analyze nodes - creates edges between nodes based
     # on dicovered pointcloud similarity and proximity
     #
-    # similarity precursor of symmetry
-    # proximity precursor of contact
-    # join axiality precursor of co-axiality (alignment)
+    # similarity is precursor of symmetry
+    # proximity is precursor of contact
+    # join axiality is precursor of co-axiality (alignment)
     #
     print("equal_sim_nodes_edges")
     assembly.equalsim_nodes_edges()
