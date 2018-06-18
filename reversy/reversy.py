@@ -435,11 +435,11 @@ class Assembly(object):
                 self.remove_edge(ed[0], ed[1])
 
     def intersect_nodes_edges(self, tol=2):
-        r"""Intersect nodes edges
+        r""" find intersection between nodes
 
         Parameters
         ----------
-        tol
+        tol : tolerance distance in millimeters
 
         Notes
         -----
@@ -447,20 +447,24 @@ class Assembly(object):
         For each couple of nodes check intersection
 
         """
+        #pdb.set_trace()
         for k,row in self.dfnodes.iterrows():
             solidk = self.get_solid_from_nodes([k])
             for j in range(k):
                 solidj = self.get_solid_from_nodes([j])
+
                 bint, dint = intersect(solidk, solidj)
                 dist = dint[~bint]
                 cond = (self.dfedges['tail']==k) & (self.dfedges['head']==j)
+
                 if len(self.dfedges[cond])>0:
                     edgeindex = self.dfedges[cond].index[0]
                 else:
-                    edegindex = max(self.dfedges.index)+1
-                print(k,j,edgeindex)
+                    edgeindex = max(self.dfedges.index)+1
+
 
                 if len(dist) == 0:
+                    print(k,j,edgeindex)
                     sr = pd.Series({'tail':k,
                                     'head':j,
                                     'bintersect':True,
@@ -540,6 +544,7 @@ class Assembly(object):
 
         Parameters
         ----------
+
         filename : string
 
         Notes
@@ -557,6 +562,7 @@ class Assembly(object):
         if not self.isclean:
             self.clean()
             self.isclean = True
+
         self.serialize()
 
         data = json_graph.node_link_data(self)
@@ -565,6 +571,7 @@ class Assembly(object):
         rep = os.path.dirname(self.origin)
         basename = os.path.basename(self.origin)
         rep = os.path.join(rep, os.path.splitext(basename)[0])
+
         if filename == '':
             filename = os.path.splitext(basename)[0]+'.json'
         filename = os.path.join(rep, filename)
@@ -955,7 +962,6 @@ class Assembly(object):
                 node_index = list(self.dfnodes.index)
             else:
                 node_index=[node_index]
-            pdb.set_trace()
 
         # assert(max(node_index) <= max(self.node.keys())), "Wrong node index"
         if max(node_index) > max(self.dfnodes.index):
@@ -963,25 +969,24 @@ class Assembly(object):
 
         if self.serialized:
             self.unserialize()
-        
-        pdb.set_trace()
+
         solid = self.get_solid_from_nodes(node_index)
 
         # solid.to_html('assembly.html')
-        if jupyter:
-            j = jupyter_renderer.JupyterRenderer()
-            j.DisplayShape(solid.shape, update=True)
-            return solid, j
-        else:
-            my_renderer = threejs_renderer.ThreejsRenderer()
-            my_renderer.DisplayShape(solid.shape)
-            my_renderer.render()
+        # if jupyter:
+        #     j = jupyter_renderer.JupyterRenderer()
+        #     j.DisplayShape(solid.shape, update=True)
+        #     return solid, j
+        # else:
+        #     my_renderer = threejs_renderer.ThreejsRenderer()
+        #     my_renderer.DisplayShape(solid.shape)
+        #     my_renderer.render()
 
-            return solid
+        return solid
 
 
 def reverse(step_filename, view=False):
-    r"""Reverse STEP file
+    r""" reverse STEP file
 
     Parameters
     ----------
@@ -1006,18 +1011,18 @@ def reverse(step_filename, view=False):
     #
     # similarity is precursor of symmetry
     # proximity is precursor of contact
-    # join axiality is precursor of co-axiality (alignment)
+    # joined axiality is precursor of co-axiality (alignment)
     #
     print("equal_sim_nodes_edges")
     assembly.equalsim_nodes_edges()
     print("delete_edges")
     # assembly.delete_edges(kind='equal')
-    print("intersect_nodes_edges")
+    #print("intersect_nodes_edges")
     assembly.intersect_nodes_edges()
     # assembly saving
     # assembly.save_gml()
-    print('save json')
-    # assembly.save_json()
+    #print('save json')
+    #assembly.save_json()
 
     if view:
         ccad_viewer = cd.view()
