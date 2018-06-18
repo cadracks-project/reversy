@@ -85,7 +85,7 @@ class Assembly(object):
         self.serialized = False
 
     def from_step(self, filename):
-        """ creates an non hierarchical assembly with a solid per node
+        """ creates a non hierarchical assembly with a solid per node
 
         Parameters
         ----------
@@ -224,7 +224,7 @@ class Assembly(object):
         # print(lsim)
         # print(lintersect)
         # print(lclose)
-        
+
         nx.draw_networkx_nodes(self, dxy, node_size=node_size, alpha=alpha)
         nx.draw_networkx_edges(self, dxy, edgelist=lequal, edge_color='b')
         nx.draw_networkx_edges(self, dxy, edgelist=lsim, edge_color='c')
@@ -464,7 +464,6 @@ class Assembly(object):
 
 
                 if len(dist) == 0:
-                    print(k,j,edgeindex)
                     sr = pd.Series({'tail':k,
                                     'head':j,
                                     'bintersect':True,
@@ -539,8 +538,8 @@ class Assembly(object):
             d['pc'] = ptcr
         self.serialized = False
 
-    def save_json(self, filename=''):
-        """ save Assembly in json format
+    def save(self):
+        """ save Assembly format
 
         Parameters
         ----------
@@ -550,65 +549,59 @@ class Assembly(object):
         Notes
         -----
         If filename=='' filename is constructed from the origin file, i.e
-        the step file which is at teh beginning of the analysis
-
-        SEE ALSO
-        --------
-
-        networkx.readwrite.json_graph
-        json.dump
+        the step file which is at the beginning of the analysis
 
         """
-        if not self.isclean:
-            self.clean()
-            self.isclean = True
 
-        self.serialize()
+        # if not self.isclean:
+        #     self.clean()
+        #     self.isclean = True
 
-        data = json_graph.node_link_data(self)
+        # self.serialize()
 
         # filename construction
         rep = os.path.dirname(self.origin)
         basename = os.path.basename(self.origin)
         rep = os.path.join(rep, os.path.splitext(basename)[0])
 
-        if filename == '':
-            filename = os.path.splitext(basename)[0]+'.json'
-        filename = os.path.join(rep, filename)
+        filenodes = os.path.splitext(basename)[0]+'_nodes.csv'
+        fileedges = os.path.splitext(basename)[0]+'_edges.csv'
 
-        fd = open(filename, 'w')
-        with fd:
-            json.dump(data, fd)
-        self.unserialize()
+        filenodes = os.path.join(rep, filenodes)
+        fileedges = os.path.join(rep, fileedges)
 
-    def from_json(self, filename):
-        """ load Assembly from json file
+        self.dfnodes.to_csv(filenodes)
+        self.dfedges.to_csv(fileedges)
+        #"self.unserialize()
+
+    def load(self, rep):
+        """ load Assembly from directory
 
         Parameters
         ----------
-        filename : string
-
+        rep : string
+              directory
         """
-        # read Graph data
-        fd = open(filename)
-        data = json.load(fd)
-        fd.close()
-
-        G = json_graph.node_link_graph(data, directed=True)
 
         self.isclean = True
-        self.nodes = G.nodes
-        self.edges = G.edges
-        self.node = G.node
-        self.edge = G.edge
-        self.origin = filename
+        self.origin =  rep
 
+        basename = os.path.basename(rep)
+        filenodes = rep+'/'+basename+'_nodes.csv'
+        fileedges = rep+'/'+basename+'_edges.csv'
+        
         # transform string node data in numpy.array
-        self.unserialize()
+        self.dfnodes = pd.read_csv(filenodes)
+        self.dfedges = pd.read_csv(fileedges)
 
-        # update nodes pos in graph
-        for inode in self:
-            self.pos[inode] = self.node[inode]['pc']
+        for k,row in self.dfnodes.iterrows():
+            V = row['V']
+            V = V.replace('[','')
+            V = V.replace(']','')
+            V = V.replace('\n','')
+            V = np.fromstring(V,sep=' ').reshape(3,3)
+            self.dfnodes.at[k,'V'] = V
+
 
     def merge_nodes(self, lnodes):
         """ merge a list of nodes into a sub Assembly
@@ -708,10 +701,6 @@ class Assembly(object):
 
         """
         if os.path.isfile(self.origin):
-            # directory = os.path.dirname(self.origin)
-            # basename = os.path.basename(self.origin)
-            # subdirectory = os.path.join(directory,
-            #                            os.path.splitext(basename)[0])
             subdirectory = self.get_dirname()
             if not os.path.isdir(subdirectory):
                 os.mkdir(subdirectory)
@@ -727,20 +716,11 @@ class Assembly(object):
         for f in filelist:
             os.remove(os.path.join(subdirectory, f))
 
-        # creates dataframe
-        #self.df_nodes = pd.DataFrame(columns=('name', 'count', 'nodes', 'volume', 'assembly'))
-        #self.dnodes ={}
         for k,row in self.dfnodes.iterrows():
-            # calculate point cloud signature
-            # pcloudk = self.node[k]['pcloud']
-            #
             # solidk : uncentered solid
-            # solidk_centered : centered solid
-            #
-            #solidk = self.node[k]['shape']
             solidk = row['shape']
             ptc = np.array(solidk.center())
-
+            #
             # warning : center of gravity is obtained
             #           from solid not from pointcloud
             solidk_centered = cm.translated(solidk, -ptc)
@@ -816,62 +796,13 @@ class Assembly(object):
             filename = pcloudk_transformed.name + ".stp"
             filename = os.path.join(subdirectory, filename)
             lnames = self.dfnodes['name'].values
+
             if not os.path.isfile(filename):
-            #if not (name in lnames):
                 # save translated transformed unique shape to filename
                 solidk.to_step(filename)
-                #index = len(self.df_nodes)
-                #self.df_nodes = self.df_nodes.set_value(index, 'name', name)
-                #self.df_nodes = self.df_nodes.set_value(index,
-                #                                        'volume',
-                                                        # solidk.volume())
-                # self.df_nodes = self.df_nodes.set_value(index, 'count', 1)
-                # self.df_nodes = self.df_nodes.set_value(index, 'nodes', [k])
-                # self.df_nodes = self.df_nodes.set_value(index,
-                                                        # 'assembly',
-                                                        # assembly)
             else:
-                # get solid from origin file
-                # solid_orig = cm.from_step(filename)
-                # TODO : why not used?
                 _ = cm.from_step(filename)
 
-
-                # transform it around origin
-                # node_solid = self.df_nodes[self.df_nodes['name']==name]['nodes'].values[0][0]
-                # print("Node_solid",k,node_solid)
-                # solid.unitary(V_orig)
-                # pcloud_orig = pc.PointCloud()
-                # pcloud_orig = pcloud_orig.from_solid(solid_orig)
-                # pcloud_orig.sorting()
-                # pcloud_orig.ordering()
-                # d0,d1 = pcloud_orig.distance(pcloudk_transformed)
-                # S = np.dot(V.T,V_orig)
-                # T1 = np.dot(pcloud_orig.p.T,pcloudk_transformed.p)
-                # T2 = np.dot(pcloudk_transformed.p.T,pcloud_orig.p)
-                # print(k, d0, d1)
-                # SI = np.diag(1./Sk)
-                # U3 = Uk[:,:3]
-                # H1 = np.dot(pcloud_orig.p.T,U3)
-                # H2 = np.dot(H1,SI)
-                # T3 = np.dot(H2,Vk)
-                # if k==7:
-                #     pdb.set_trace()
-                # self.node[k]['V'] = V_orig
-                # print(d0,d1)
-                # if pcloudk != pcloud_orig:
-                #     V1 = pcloud_orig.get_transform(pcloudk)
-                #     V2 = pcloudk.get_transform(pcloud_orig)
-                #     fig,ax = pcloudk.show(c = 'r')
-                #     fig,ax = pcloud_orig.show(fig=fig, ax=ax, c='b')
-                #     plt.show()
-                #     pdb.set_trace()
-
-                #dfname = self.df_nodes[self.df_nodes['name'] == name]
-                #dfname['count'] += 1
-                #dfname.iloc[0]['nodes'].append(k)
-                #self.df_nodes[self.df_nodes['name'] == name] = dfname
-            #self.dnodes[k] = index
 
     def get_dirname(self):
         """ get dirname from self.origin
@@ -881,14 +812,14 @@ class Assembly(object):
 
         If the origin file is a step file, there is a creation of
         directory with the same name where all the derivated files
-        will be placed, including step files and json files.
-
+        will be placed, including step files and graph files (csv or json).
         """
         ext = os.path.splitext(self.origin)[1]
         if ext == '.stp' or ext == '.step':
             dirname = os.path.splitext(self.origin)[0]
         else:
-            dirname = os.path.dirname(self.origin)
+            dirname = self.origin
+
         return dirname
 
     def get_solid_from_nodes(self, lnodes):
@@ -1001,11 +932,7 @@ def reverse(step_filename, view=False):
     assembly = Assembly()
     assembly.from_step(step_filename)
     # write a separate step file for each node
-    # print("write_components")
-    # tic = time.time()
     assembly.write_components()
-    # toc = time.time()
-    # print(toc-tic)
     # tag and analyze nodes - creates edges between nodes based
     # on dicovered pointcloud similarity and proximity
     #
@@ -1015,14 +942,17 @@ def reverse(step_filename, view=False):
     #
     print("equal_sim_nodes_edges")
     assembly.equalsim_nodes_edges()
-    print("delete_edges")
-    # assembly.delete_edges(kind='equal')
-    #print("intersect_nodes_edges")
+    print("intersect_nodes_edges")
     assembly.intersect_nodes_edges()
+    #remove useless columns from the dataframe
+    del assembly.dfnodes['shape']
+    del assembly.dfnodes['pcloud']
+    del assembly.dfnodes['sig']
+    del assembly.dfnodes['pos']
     # assembly saving
-    # assembly.save_gml()
-    #print('save json')
-    #assembly.save_json()
+    # assembly.save_gml)
+    print('save nodes and edges dataframe')
+    assembly.save()
 
     if view:
         ccad_viewer = cd.view()
