@@ -1,5 +1,6 @@
 # coding: utf-8
 """Decomposing an assembly obtained from a STEP file
+
 """
 
 from __future__ import print_function
@@ -29,7 +30,7 @@ from interval import interval
 #except ImportError:
 #    from interval import Interval as interval
 
-import pointcloud as pc
+from . import pointcloud as pc
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ class Assembly(object):
     'pc' : a translation vector
     'V' : a unitary matrix
     'volume' : volume of the solid associated to the node
-    'assembly' : boolean
+    'bassembly' : boolean
         True if the node is an assembly
 
     Methods
@@ -72,10 +73,15 @@ class Assembly(object):
         super(Assembly, self).__init__()
 
         # A dataframe for the nodes
-        self.dfnodes = pd.DataFrame()
-        # A dataframe for the edges
-        self.dfedges = pd.DataFrame()
-        self.pos = dict()
+        self.dfnodes = pd.DataFrame(columns=['shape','volume','pos','bassembly']) # A dataframe for the edges
+        # shape
+        # volume
+        # pos
+        # bassembly
+        self.dfedges = pd.DataFrame(columns=('tail', 'head', 'bequal', 'bsim', 'bintersect', 'bclose'))
+        # tail : tail node index
+        # head : head node index
+        #
         self.serialized = False
 
     def from_step(self, filename):
@@ -136,8 +142,7 @@ class Assembly(object):
                     #               shape=solid,
                     #               volume=solid.volume(),
                     #               assembly=False)
-                    self.dfnnodes.ix[self.nnodes]={'shape':solid,'volume':solid.volume,'assembly':False,'pos':solid.center()}
-                    pdb.set_trace()
+                    self.dfnodes.loc[self.nnodes]={'shape':solid,'volume':solid.volume(),'bassembly':False,'pos':solid.center()}
                     #self.add_node(self.nnodes,
                     #              shape=solid,
                     #            volume=solid.volume(),
@@ -147,9 +152,9 @@ class Assembly(object):
 
     def __repr__(self):
         # st = self.shape.__repr__()+'\n'
-        st = str(self.nnodes) + ' nodes' + '\n'
-        for k in self.node:
-            st += self.node[k]['name'] + '\n'
+        st = str(len(self.dfnodes)) + ' nodes' + '\n'
+        for k,row in self.dfnodes.iterrows():
+            st += row['name'] + '\n'
         return st
 
     def remove_nodes(self, lnodes):
@@ -209,16 +214,17 @@ class Assembly(object):
         plt.suptitle(self.origin, fontsize=fontsize+2)
         plt.subplot(2, 2, 1)
 
-        lequal = [x for x in list(self.edges()) if self[x[0]][x[1]]['equal']]
-        lsim = [x for x in list(self.edges) if self[x[0]][x[1]]['sim']]
-        lintersect = [x for x in list(self.edges()) if self[x[0]][x[1]]['intersect']]
-        lclose = [x for x in list(self.edges()) if self[x[0]][x[1]]['close']]
+        lequal = [x for x in list(self.edges()) if self[x[0]][x[1]]['bequal']]
+        lsim = [x for x in list(self.edges) if self[x[0]][x[1]]['bsim']]
+        lintersect = [x for x in list(self.edges()) if self[x[0]][x[1]]['bintersect']]
+        lclose = [x for x in list(self.edges()) if self[x[0]][x[1]]['bclose']]
         # lequal = [ x for x in self.edges()
         #                                   if 'equal' in self.edge[x[0]][x[1]]]
         # print(lequal)
         # print(lsim)
         # print(lintersect)
         # print(lclose)
+        
         nx.draw_networkx_nodes(self, dxy, node_size=node_size, alpha=alpha)
         nx.draw_networkx_edges(self, dxy, edgelist=lequal, edge_color='b')
         nx.draw_networkx_edges(self, dxy, edgelist=lsim, edge_color='c')
@@ -300,11 +306,11 @@ class Assembly(object):
         #       check if point cloud are equal
         #       check if point cloud are close
         # dist is the distance fingerprint
+        edgeindex = 0
         if not self.isclean:
-            self.df_edges = pd.DataFrame(columns=('tail', 'head', 'equal', 'sim', 'intersect', 'close'))
             self.lsig = []
-            for k in self.node:
-                solidk = self.node[k]['shape']
+            for k,row in self.dfnodes.iterrows():
+                solidk = row['shape']
                 pcloudk = pc.PointCloud()
                 pcloudk = pcloudk.from_solid(solidk)
                 pcloudk.sorting()
@@ -313,7 +319,7 @@ class Assembly(object):
                 # maxk = np.max(pcloudk.p, axis=0)
                 dk = pcloudk.dist
                 for j in range(k):
-                    solidj = self.node[j]['shape']
+                    solidj = self.dfnodes.loc[j]['shape']
                     pcloudj = pc.PointCloud()
                     pcloudj = pcloudj.from_solid(solidj)
                     pcloudj.sorting()
@@ -329,73 +335,90 @@ class Assembly(object):
                         DEjk = np.sum(np.abs(dk-dj))
                         rho2 = DEjk/(Edn+Edj)
                         #
-                        # Relation 1 : equal
+                        # Relation 1 : equal   (equal)
                         #
                         if np.allclose(DEjk, 0):
+                            sr = pd.Series({'tail':k,
+                                            'head':j,
+                                            'bequal':True,
+                                            'bsim':True,
+                                            'bintersect':False,
+                                            'bclose':False})
                             # The two point clouds are equal w.r.t sorted
                             # points to origin distances
-                            if self[j].keys() == []:
-                                self.add_edge(k, j,
-                                              equal=True,
-                                              sim=True,
-                                              intersect=False,
-                                              close=False,
-                                              djk=DEjk)
+                            #if self[j].keys() == []:
+                                # self.add_edge(k, j,
+                                #               equal=True,
+                                #               sim=True,
+                                #               intersect=False,
+                                #               close=False,
+                                #               djk=DEjk)
+                            self.dfedges.loc[edgeindex] = sr
+                            edgeindex += 1
                         #
-                        # Relation 2 : almost equal
+                        # Relation 2 : almost equal   (sim)
                         #
                         elif (rho1 < 0.01) and (rho2 < 0.05):
-                            if nx.DiGraph(self)[j].keys() == []:
+                            #if nx.DiGraph(self)[j].keys() == []:
                                 # The two point clouds are closed w.r.t sorted
                                 # point to origin distances
-                                self.add_edge(k, j,
-                                              equal=False,
-                                              sim=True,
-                                              intersect=False,
-                                              close=False)
+                            sr = pd.Series({'tail':k,
+                                            'head':j,
+                                            'bequal':False,
+                                            'bsim':True,
+                                            'bintersect':False,
+                                            'bclose':False})
+                            self.dfedges.loc[edgeindex] = sr
+                                #self.dfedges['DEth']=pd.Series([DEjk],index=[edgeindex])
+                            edgeindex += 1
+                                # self.add_edge(k, j,
+                                #               equal=False,
+                                #               sim=True,
+                                #               intersect=False,
+                                #               close=False)
 
-            self.lsig = []
-            for k in self.node:
-                solidk = self.node[k]['shape']
-                pcloudk = pc.PointCloud()
-                pcloudk = pcloudk.from_solid(solidk)
-                pcloudk.sorting()
-                pcloudk.ordering()
-                pcloudk.signature()
+            #self.lsig = []
+            #for k,row in self.dfnodes:
+            #    solidk = row['shape']
+            #    pcloudk = pc.PointCloud()
+            #    pcloudk = pcloudk.from_solid(solidk)
+            #    pcloudk.sorting()
+            #    pcloudk.ordering()
+            #    pcloudk.signature()
 
-                lsamek = [x for x in nx.DiGraph(self)[k].keys() if nx.DiGraph(self)[k][x]['equal']]
+            #    lsamek = [x for x in nx.DiGraph(self)[k].keys() if nx.DiGraph(self)[k][x]['equal']]
 
-                if lsamek == []:
-                    self.lsig.append(pcloudk.sig)
-                    # self.node[k]['name'] = pcloudk.name
-                    # self.node[k]['V'] = pcloudk.V
-                else:
-                    refnode = [x for x in lsamek if self[x].keys()==[]][0]
-                    self.node[k]['name'] = self.node[refnode]['name']
-                    pcsame = self.node[refnode]['pc']
-                    #
-                    # self.node[k]['V']= self.node[refnode]['V']
-                    #
-                    # detection of eventual symmetry
-                    #
-                    # The symmetry is informed in the node
-                    #
-                    vec = np.abs(pcsame-pcloudk.pc)[None,:]
-                    dp = np.sum(vec, axis=0)
-                    nomirror = np.isclose(dp, 0)
-                    if nomirror[0] is False:
-                        self.add_node(k, mx=True)
-                    if nomirror[1] is False:
-                        self.add_node(k, my=True)
-                    if nomirror[2] is False:
-                        self.add_node(k, mz=True)
+            #    if lsamek == []:
+            #        self.lsig.append(pcloudk.sig)
+            #        # self.node[k]['name'] = pcloudk.name
+            #        # self.node[k]['V'] = pcloudk.V
+            #    else:
+            #        refnode = [x for x in lsamek if self[x].keys()==[]][0]
+            #        self.node[k]['name'] = self.node[refnode]['name']
+            #        pcsame = self.node[refnode]['pc']
+            #        #
+            #        # self.node[k]['V']= self.node[refnode]['V']
+            #        #
+            #        # detection of eventual symmetry
+            #        #
+            #        # The symmetry is informed in the node
+            #        #
+            #        vec = np.abs(pcsame-pcloudk.pc)[None,:]
+            #        dp = np.sum(vec, axis=0)
+            #        nomirror = np.isclose(dp, 0)
+            #        if nomirror[0] is False:
+            #            self.add_node(k, mx=True)
+            #        if nomirror[1] is False:
+            #            self.add_node(k, my=True)
+            #        if nomirror[2] is False:
+            #            self.add_node(k, mz=True)
 
-                # self.node[k]['V'] = pcloudk.V
-                # self.node[k]['pc'] = pcloudk.pc
+            #    # self.node[k]['V'] = pcloudk.V
+            #    # self.node[k]['pc'] = pcloudk.pc
 
-        # unique the list
-        self.lsig = list(set(self.lsig))
-        self.Nn = len(self.node)
+        ## unique the list
+        #self.lsig = list(set(self.lsig))
+        #self.Nn = len(self.node)
 
     def delete_edges(self,kind='equal'):
         """ delete edges of a specific kind
@@ -424,27 +447,32 @@ class Assembly(object):
         For each couple of nodes check intersection
 
         """
-        for k in self.node:
+        for k,row in self.dfnodes.iterrows():
             solidk = self.get_solid_from_nodes([k])
             for j in range(k):
                 solidj = self.get_solid_from_nodes([j])
                 bint, dint = intersect(solidk, solidj)
                 dist = dint[~bint]
+                cond = (self.dfedges['tail']==k) & (self.dfedges['head']==j)
+                if len(self.dfedges[cond])>0:
+                    edgeindex = self.dfedges[cond].index[0]
+                else:
+                    edegindex = max(self.dfedges.index)+1
+                print(k,j,edgeindex)
+
                 if len(dist) == 0:
-                    # print(k, j, dist)
-                    self.add_edge(k, j,
-                                  intersect=True,
-                                  close=True,
-                                  equal=False,
-                                  sim=False)
+                    sr = pd.Series({'tail':k,
+                                    'head':j,
+                                    'bintersect':True,
+                                    'bclose':True})
+                    self.dfedges.loc[edgeindex,['tail','head','bintersect','bclose']] = sr
                 elif len(dist) == 1:
-                    # print(dist[0])
                     if dist[0] < tol:
-                        self.add_edge(k, j,
-                                      close=True,
-                                      intersect=False,
-                                      equal=False,
-                                      sim=False)
+                        sr = pd.Series({'tail':k,
+                                            'head':j,
+                                            'bintersect':False,
+                                            'bclose':True})
+                        self.dfedges.loc[edgeindex,['tail','head','bintersect','bclose']] = sr
 
     def clean(self):
         """
@@ -693,16 +721,17 @@ class Assembly(object):
             os.remove(os.path.join(subdirectory, f))
 
         # creates dataframe
-        self.df_nodes = pd.DataFrame(columns=('name', 'count', 'nodes', 'volume', 'assembly'))
-        self.dnodes ={}
-        for k in self.node:
+        #self.df_nodes = pd.DataFrame(columns=('name', 'count', 'nodes', 'volume', 'assembly'))
+        #self.dnodes ={}
+        for k,row in self.dfnodes.iterrows():
             # calculate point cloud signature
             # pcloudk = self.node[k]['pcloud']
             #
             # solidk : uncentered solid
             # solidk_centered : centered solid
             #
-            solidk = self.node[k]['shape']
+            #solidk = self.node[k]['shape']
+            solidk = row['shape']
             ptc = np.array(solidk.center())
 
             # warning : center of gravity is obtained
@@ -719,29 +748,38 @@ class Assembly(object):
 
             Npoints = pcloudk.Npoints
 
-            self.node[k]['pc'] = ptc
-            self.node[k]['flip'] = False
-            self.node[k]['Npoints'] = Npoints
-
-            if np.linalg.det(V)>0:
-                self.node[k]['V'] = V
-            else:
+            sr = pd.Series({'pc':ptc,
+                           'flip':False,
+                           'Npoints':Npoints,
+                           'V':V,
+                            'name':None,
+                            'sig':None,
+                           'pcloud':None})
+            # self.dfnodes['pc'] = pd.Series([ptc],index=[k])
+            # self.dfnodes['flip'] = pd.Series([False],index=[k])
+            # self.dfnodes['Npoints'] = pd.Series([Npoints],index=[k])
+            if np.linalg.det(V)<0:
                 V[:, 2] = -V[:, 2]
-                self.node[k]['V'] = V
-                self.node[k]['flip'] = True
-            # V is a assert as a rotation
+                #self.dfnodes.loc[k]['V'] = V
+                sr['V']=V
+                sr['flip'] = True
+
+            # V is asserted as a rotation
             if np.linalg.det(V) <= 0:
                 raise AssertionError("")
 
-            assembly = self.node[k]['assembly']
+            # bassembly = self.dfnodes.loc[k]['bassembly']
             #
             # Transfer solidk to the origin
             #
             # The order of the geometrical operations is important
             #
             solidk.translate(-ptc)
-            if self.node[k]['flip']:
+
+            #if self.dfnodes.loc[k]['flip']:
+            if sr['flip']:
                 solidk.mirrorz()
+
             solidk.unitary(V.T)
             # assert(np.allclose(solidk.center(),0))
             #
@@ -752,28 +790,39 @@ class Assembly(object):
             pcloudk_transformed.sorting()
             pcloudk_transformed.ordering()
             pcloudk_transformed.signature()
-            self.node[k]['sig'] = pcloudk_transformed.sig
+            sr['sig'] = pcloudk_transformed.sig
+
+            #self.dfnodes['sig'] = pd.Series([pcloudk_transformed.sig],index=[k])
             name = pcloudk_transformed.name
-            self.node[k]['name'] = name
-            self.node[k]['pcloud'] = pcloudk_transformed
+            sr['name'] = name
+            sr['pcloud'] = pcloudk_transformed
+            if 'pcloud' not in self.dfnodes.columns:
+                dfsr = pd.DataFrame(sr,columns=[k]).T
+                self.dfnodes =  pd.concat([self.dfnodes,dfsr],axis=1)
+            else:
+                # this pandas syntax is important
+                self.dfnodes.loc[k,sr.keys()] = sr
+
+            #self.dfnodes['name'] = pd.Series([name],index=[k])
+            #self.dfnodes['pcloud'] = pd.Series([pcloudk_transformed],index=[k])
 
             filename = pcloudk_transformed.name + ".stp"
             filename = os.path.join(subdirectory, filename)
-            lnames = self.df_nodes['name'].values
-            # if not os.path.isfile(filename):
-            if not (name in lnames):
+            lnames = self.dfnodes['name'].values
+            if not os.path.isfile(filename):
+            #if not (name in lnames):
                 # save translated transformed unique shape to filename
                 solidk.to_step(filename)
-                index = len(self.df_nodes)
-                self.df_nodes = self.df_nodes.set_value(index, 'name', name)
-                self.df_nodes = self.df_nodes.set_value(index,
-                                                        'volume',
-                                                        solidk.volume())
-                self.df_nodes = self.df_nodes.set_value(index, 'count', 1)
-                self.df_nodes = self.df_nodes.set_value(index, 'nodes', [k])
-                self.df_nodes = self.df_nodes.set_value(index,
-                                                        'assembly',
-                                                        assembly)
+                #index = len(self.df_nodes)
+                #self.df_nodes = self.df_nodes.set_value(index, 'name', name)
+                #self.df_nodes = self.df_nodes.set_value(index,
+                #                                        'volume',
+                                                        # solidk.volume())
+                # self.df_nodes = self.df_nodes.set_value(index, 'count', 1)
+                # self.df_nodes = self.df_nodes.set_value(index, 'nodes', [k])
+                # self.df_nodes = self.df_nodes.set_value(index,
+                                                        # 'assembly',
+                                                        # assembly)
             else:
                 # get solid from origin file
                 # solid_orig = cm.from_step(filename)
@@ -811,11 +860,11 @@ class Assembly(object):
                 #     plt.show()
                 #     pdb.set_trace()
 
-                dfname = self.df_nodes[self.df_nodes['name'] == name]
-                dfname['count'] += 1
-                dfname.iloc[0]['nodes'].append(k)
-                self.df_nodes[self.df_nodes['name'] == name] = dfname
-            self.dnodes[k] = index
+                #dfname = self.df_nodes[self.df_nodes['name'] == name]
+                #dfname['count'] += 1
+                #dfname.iloc[0]['nodes'].append(k)
+                #self.df_nodes[self.df_nodes['name'] == name] = dfname
+            #self.dnodes[k] = index
 
     def get_dirname(self):
         """ get dirname from self.origin
@@ -851,19 +900,20 @@ class Assembly(object):
 
         If the assembly file has extension .stp it means that the analysis has
         not been done. After the analysis a directory has been created, it
-        contains all the .stp file of the parts and a .json file which contains
+        contains all the .stp files of the parts and a .json file which contains
         the graph information.
 
         """
         if lnodes == -1:
-            lnodes = self.node.keys()
+            #lnodes = self.node.keys()
+            lnodes = list(self.dfnodes.index)
 
         rep = self.get_dirname()
 
-        lfiles = [str(self.node[k]['name'])+'.stp' for k in lnodes]
-        lV = [self.node[k]['V'] for k in lnodes]
-        lflip = [self.node[k]['flip'] for k in lnodes]
-        lpc = [self.node[k]['pc'] for k in lnodes]
+        lfiles = [str(self.dfnodes.loc[k,'name'])+'.stp' for k in lnodes]
+        lV = [ self.dfnodes.loc[k,'V'] for k in lnodes ]
+        lflip = [ self.dfnodes.loc[k,'flip'] for k in lnodes ]
+        lpc = [ self.dfnodes.loc[k,'pc'] for k in lnodes ]
         solid = cm.Solid([])
 
         for k, s in enumerate(lfiles):
@@ -902,17 +952,19 @@ class Assembly(object):
         # if type(node_index) == int:
         if isinstance(node_index, int):
             if node_index == -1:
-                node_index = self.node.keys()
+                node_index = list(self.dfnodes.index)
             else:
                 node_index=[node_index]
+            pdb.set_trace()
 
         # assert(max(node_index) <= max(self.node.keys())), "Wrong node index"
-        if max(node_index) > max(self.node.keys()):
+        if max(node_index) > max(self.dfnodes.index):
             raise AssertionError("Wrong node index")
 
         if self.serialized:
-            s.unserialize()
-
+            self.unserialize()
+        
+        pdb.set_trace()
         solid = self.get_solid_from_nodes(node_index)
 
         # solid.to_html('assembly.html')
