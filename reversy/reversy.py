@@ -9,6 +9,7 @@ import os
 # import time
 # import pdb
 import logging
+import sys
 import json
 import pdb
 import networkx as nx
@@ -152,7 +153,8 @@ class Assembly(object):
 
     def __repr__(self):
         # st = self.shape.__repr__()+'\n'
-        st = str(len(self.dfnodes)) + ' nodes' + '\n'
+        #st = str(len(self.dfnodes)) + ' nodes' + '\n'
+        st = self.origin + '\n'
         for k,row in self.dfnodes.iterrows():
             st += row['name'] + '\n'
         return st
@@ -589,7 +591,7 @@ class Assembly(object):
         basename = os.path.basename(rep)
         filenodes = rep+'/'+basename+'_nodes.csv'
         fileedges = rep+'/'+basename+'_edges.csv'
-        
+
         # transform string node data in numpy.array
         self.dfnodes = pd.read_csv(filenodes)
         self.dfedges = pd.read_csv(fileedges)
@@ -601,6 +603,11 @@ class Assembly(object):
             V = V.replace('\n','')
             V = np.fromstring(V,sep=' ').reshape(3,3)
             self.dfnodes.at[k,'V'] = V
+            pc = row['pc']
+            pc = pc.replace('[','')
+            pc = pc.replace(']','')
+            pc = np.fromstring(pc,sep=' ')
+            self.dfnodes.at[k,'pc'] = pc
 
 
     def merge_nodes(self, lnodes):
@@ -852,11 +859,13 @@ class Assembly(object):
         lV = [ self.dfnodes.loc[k,'V'] for k in lnodes ]
         lflip = [ self.dfnodes.loc[k,'flip'] for k in lnodes ]
         lpc = [ self.dfnodes.loc[k,'pc'] for k in lnodes ]
+
         solid = cm.Solid([])
 
         for k, s in enumerate(lfiles):
             filename = os.path.join(rep, s)
             shp = cm.from_step(filename)
+            #print(s,sys.getsizeof(shp))
             # assert(np.allclose(np.array(shp.center()),0)),pdb.set_trace()
             V = lV[k]
             shp.unitary(V)
@@ -898,9 +907,9 @@ class Assembly(object):
         if max(node_index) > max(self.dfnodes.index):
             raise AssertionError("Wrong node index")
 
-        if self.serialized:
-            self.unserialize()
-
+        #if self.serialized:
+        # self.unserialize()
+        pdb.set_trace()
         solid = self.get_solid_from_nodes(node_index)
 
         # solid.to_html('assembly.html')
