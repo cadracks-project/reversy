@@ -863,6 +863,9 @@ class Assembly(object):
         solid = cm.Solid([])
 
         for k, s in enumerate(lfiles):
+            print(k,solid)
+            if k==8:
+                pdb.set_trace()
             filename = os.path.join(rep, s)
             shp = cm.from_step(filename)
             #print(s,sys.getsizeof(shp))
