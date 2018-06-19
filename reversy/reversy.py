@@ -572,8 +572,8 @@ class Assembly(object):
         filenodes = os.path.join(rep, filenodes)
         fileedges = os.path.join(rep, fileedges)
 
-        self.dfnodes.to_csv(filenodes)
-        self.dfedges.to_csv(fileedges)
+        self.dfnodes.to_csv(filenodes,float_format='%9f')
+        self.dfedges.to_csv(fileedges,float_format='%9f')
         #"self.unserialize()
 
     def load(self, rep):
